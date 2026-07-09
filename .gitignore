@@ -6,7 +6,7 @@ build/
 *.db
 *.db-shm
 *.db-wal
-data/
+/engine/data/
 .DS_Store
 *.log
 
