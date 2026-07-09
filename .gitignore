@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.db
+*.db-shm
+*.db-wal
+/engine/data/
+.DS_Store
+*.log
+
+# Android
+android/.gradle/
+android/local.properties
+android/*.iml
+android/.idea/
+android/build/
+android/app/build/
+android/**/build/
+*.keystore
+*.jks
+android/keystore.properties
+
+# CI/misc
+coverage/

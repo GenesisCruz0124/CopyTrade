@@ -1,0 +1,109 @@
+package com.copytrade.app.ui.strings
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+
+enum class AppLanguage { ENGLISH, TAGLISH }
+
+val LocalAppLanguage = compositionLocalOf { AppLanguage.ENGLISH }
+
+/** A string with both an English and a Taglish rendering, picked by the current app language. */
+data class Bi(val en: String, val tl: String)
+
+@Composable
+fun Bi.resolve(): String {
+    return if (LocalAppLanguage.current == AppLanguage.ENGLISH) en else tl
+}
+
+/** All user-facing copy in the app, in both English and Taglish. */
+object Strings {
+    val appName = Bi("CopyTrade", "CopyTrade")
+
+    // Setup / login
+    val setupTitle = Bi("Connect to your engine", "I-connect sa iyong engine")
+    val serverUrlLabel = Bi("Server URL", "URL ng Server")
+    val bearerTokenLabel = Bi("Bearer token", "Bearer token")
+    val testConnection = Bi("Test connection", "I-test ang koneksyon")
+    val connectAndContinue = Bi("Connect & continue", "Kumonekta at magpatuloy")
+    val connectionSuccess = Bi("Connected successfully", "Successful ang koneksyon")
+    val connectionFailed = Bi("Could not connect. Check the URL and token.", "Hindi ma-connect. I-check ang URL at token.")
+
+    // Dashboard
+    val dashboardTitle = Bi("Dashboard", "Dashboard")
+    val totalBalance = Bi("Total balance", "Kabuuang balanse")
+    val activeBots = Bi("Active bots", "Mga aktibong bot")
+    val noBotsYet = Bi("No bots yet. Tap + to create one.", "Wala pang bot. I-tap ang + para gumawa.")
+    val killSwitch = Bi("Kill switch", "Kill switch")
+    val killSwitchConfirmTitle = Bi("Are you sure?", "Sigurado ka ba?")
+    val killSwitchConfirmMessage = Bi(
+        "All open orders will be cancelled and every bot paused.",
+        "Lahat ng open orders ay ika-cancel at ma-pause ang lahat ng bot."
+    )
+    val cancel = Bi("Cancel", "Kanselahin")
+    val confirm = Bi("Confirm", "Kumpirmahin")
+    val paperModeBadge = Bi("PAPER", "PAPER")
+    val liveModeBadge = Bi("LIVE", "LIVE")
+
+    // Bot detail
+    val botDetailTitle = Bi("Bot detail", "Detalye ng bot")
+    val openOrders = Bi("Open orders", "Mga bukas na order")
+    val recentFills = Bi("Recent fills", "Kamakailang fills")
+    val pnlChart = Bi("PnL", "PnL")
+    val start = Bi("Start", "Simulan")
+    val pause = Bi("Pause", "I-pause")
+    val stop = Bi("Stop", "Itigil")
+    val delete = Bi("Delete", "Burahin")
+    val statusRunning = Bi("Running", "Tumatakbo")
+    val statusPaused = Bi("Paused", "Naka-pause")
+    val statusStopped = Bi("Stopped", "Nakatigil")
+    val botPausedToast = Bi("Bot is paused", "Naka-pause ang bot")
+
+    // Create bot
+    val createBotTitle = Bi("Create bot", "Gumawa ng bot")
+    val strategyType = Bi("Strategy", "Estratehiya")
+    val grid = Bi("Grid", "Grid")
+    val dca = Bi("DCA", "DCA")
+    val symbol = Bi("Symbol", "Symbol")
+    val lowerPrice = Bi("Lower price", "Pinakamababang presyo")
+    val upperPrice = Bi("Upper price", "Pinakamataas na presyo")
+    val gridLevels = Bi("Grid levels", "Grid levels")
+    val totalBudget = Bi("Total budget (USDT)", "Kabuuang budget (USDT)")
+    val gridMode = Bi("Mode", "Mode")
+    val amountPerBuy = Bi("Amount per buy (USDT)", "Halaga bawat bili (USDT)")
+    val interval = Bi("Interval", "Interval")
+    val dipMultiplier = Bi("Dip multiplier", "Dip multiplier")
+    val dipThreshold = Bi("Dip threshold (%)", "Dip threshold (%)")
+    val takeProfit = Bi("Take-profit (%)", "Take-profit (%)")
+    val confirmLive = Bi("I understand this trades with real funds", "Naiintindihan kong gagamit ito ng totoong pera")
+    val create = Bi("Create", "Gumawa")
+    val validationError = Bi("Please fix the highlighted fields", "Pakiayos ang mga naka-highlight na field")
+
+    // Trade log
+    val tradeLogTitle = Bi("Trade log", "Trade log")
+    val allBots = Bi("All bots", "Lahat ng bot")
+    val noFillsYet = Bi("No fills yet", "Wala pang fills")
+
+    // Settings
+    val settingsTitle = Bi("Settings", "Settings")
+    val language = Bi("Language", "Wika")
+    val english = Bi("English", "English")
+    val taglish = Bi("Taglish", "Taglish")
+    val serverSettings = Bi("Server settings", "Server settings")
+    val about = Bi("About", "Tungkol dito")
+    val aboutBody = Bi(
+        "CopyTrade controls a self-hosted MEXC Spot grid/DCA engine. No analytics, no trackers.",
+        "Kinokontrol ng CopyTrade ang sarili mong MEXC Spot grid/DCA engine. Walang analytics, walang tracker."
+    )
+    val logout = Bi("Disconnect", "Idiskonekta")
+
+    // Common
+    val retry = Bi("Retry", "Ulitin")
+    val loading = Bi("Loading…", "Naglo-load…")
+    val error = Bi("Something went wrong", "May nagkamali")
+}
+
+@Composable
+fun ProvideAppLanguage(language: AppLanguage, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalAppLanguage provides language, content = content)
+}
