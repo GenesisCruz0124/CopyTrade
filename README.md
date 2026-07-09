@@ -1,1 +1,1 @@
-# TradeBot
+# CopyTrade
