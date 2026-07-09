@@ -1,6 +1,7 @@
 import type {
   AccountInfo,
   ExchangeInfo,
+  Kline,
   OrderResult,
   PlaceOrderParams,
   TickerPrice,
@@ -21,4 +22,5 @@ export interface ExchangeClient {
   queryOrder(symbol: string, orderId?: string, clientOrderId?: string): Promise<OrderResult>;
   openOrders(symbol?: string): Promise<OrderResult[]>;
   myTrades(symbol: string): Promise<TradeResult[]>;
+  getKlines(symbol: string, interval: string, limit?: number): Promise<Kline[]>;
 }

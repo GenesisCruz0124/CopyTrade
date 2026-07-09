@@ -3,6 +3,7 @@ import type { MexcRestClient } from "../mexc/restClient.js";
 import type {
   AccountInfo,
   ExchangeInfo,
+  Kline,
   OrderResult,
   PlaceOrderParams,
   TickerPrice,
@@ -45,5 +46,9 @@ export class LiveExchangeClient implements ExchangeClient {
 
   myTrades(symbol: string): Promise<TradeResult[]> {
     return this.rest.myTrades(symbol);
+  }
+
+  getKlines(symbol: string, interval: string, limit?: number): Promise<Kline[]> {
+    return this.rest.klines(symbol, interval, limit);
   }
 }

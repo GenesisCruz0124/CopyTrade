@@ -40,6 +40,7 @@ function makeExchange(overrides: Partial<ExchangeClient> = {}): ExchangeClient {
     queryOrder: async () => ({} as OrderResult),
     openOrders: async () => [],
     myTrades: async () => [] as TradeResult[],
+    getKlines: async () => [],
     ...overrides
   };
 }

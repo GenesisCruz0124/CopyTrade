@@ -1,0 +1,14 @@
+services:
+  engine:
+    build: .
+    container_name: copytrade-engine
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - copytrade-data:/app/data
+
+volumes:
+  copytrade-data:

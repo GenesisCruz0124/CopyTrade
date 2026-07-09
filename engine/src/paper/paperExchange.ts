@@ -4,6 +4,7 @@ import type {
   AccountBalance,
   AccountInfo,
   ExchangeInfo,
+  Kline,
   OrderResult,
   OrderStatus,
   PlaceOrderParams,
@@ -29,6 +30,8 @@ export interface PaperExchangeOptions {
   seedBalances: Record<string, number>;
   exchangeInfoProvider: () => Promise<ExchangeInfo>;
   slippageBps?: number;
+  /** Klines are public market data; paper mode delegates to the live REST client for them. */
+  klinesProvider?: (symbol: string, interval: string, limit?: number) => Promise<Kline[]>;
 }
 
 /**
@@ -46,11 +49,13 @@ export class PaperExchange implements ExchangeClient {
   private lastPrices = new Map<string, number>();
   private readonly slippageBps: number;
   private readonly exchangeInfoProvider: () => Promise<ExchangeInfo>;
+  private readonly klinesProvider?: (symbol: string, interval: string, limit?: number) => Promise<Kline[]>;
   private exchangeInfoCache: ExchangeInfo | null = null;
 
   constructor(opts: PaperExchangeOptions) {
     this.slippageBps = opts.slippageBps ?? 5;
     this.exchangeInfoProvider = opts.exchangeInfoProvider;
+    this.klinesProvider = opts.klinesProvider;
     for (const [asset, amount] of Object.entries(opts.seedBalances)) {
       this.balances.set(asset, { asset, free: amount, locked: 0 });
     }
@@ -160,6 +165,11 @@ export class PaperExchange implements ExchangeClient {
 
   async myTrades(symbol: string): Promise<TradeResult[]> {
     return this.trades.filter((t) => t.symbol === symbol);
+  }
+
+  async getKlines(symbol: string, interval: string, limit?: number): Promise<Kline[]> {
+    if (!this.klinesProvider) return [];
+    return this.klinesProvider(symbol, interval, limit);
   }
 
   private fillOrder(order: PaperOrder, fillPrice: number): void {
