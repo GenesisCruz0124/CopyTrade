@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to attach the APK to"
+        required: true
+        default: "v1.0.0"
 
 jobs:
   build-and-release:
@@ -64,11 +70,21 @@ jobs:
           echo "path=android/$apk_path" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$apk_path")" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
           files: ${{ steps.apk.outputs.path }}
-          name: ${{ github.ref_name }}
+          name: ${{ steps.tag.outputs.name }}
           generate_release_notes: true
 
       - name: Clean up keystore
