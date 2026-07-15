@@ -146,3 +146,93 @@ describe("SafetyRails.checkOrder", () => {
     expect(result.reason).toMatch(/kill switch/);
   });
 });
+
+describe("SafetyRails.checkOrder — futures", () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    runMigrations(db);
+  });
+
+  it("allows a futures order within max leverage and liquidation distance", async () => {
+    insertBot(db, { allocated_usdt: 100000 });
+    const rails = new SafetyRails({
+      db,
+      exchange: makeExchange(),
+      maxPriceDeviationPct: 5,
+      defaultDailyLossLimitUsdt: 50,
+      maxFuturesLeverage: 20,
+      minLiquidationDistancePct: 5
+    });
+    const result = await rails.checkOrder("bot-1", {
+      symbol: "BTC_USDT",
+      side: "BUY",
+      price: 50000,
+      quantity: 0.01,
+      futures: { leverage: 5, positionType: "long", maintenanceMarginRate: 0.005, marketPrice: 50000 }
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("rejects futures orders that exceed the configured max leverage", async () => {
+    insertBot(db, { allocated_usdt: 100000 });
+    const rails = new SafetyRails({
+      db,
+      exchange: makeExchange(),
+      maxPriceDeviationPct: 5,
+      defaultDailyLossLimitUsdt: 50,
+      maxFuturesLeverage: 20,
+      minLiquidationDistancePct: 5
+    });
+    const result = await rails.checkOrder("bot-1", {
+      symbol: "BTC_USDT",
+      side: "BUY",
+      price: 50000,
+      quantity: 0.01,
+      futures: { leverage: 50, positionType: "long", maintenanceMarginRate: 0.005, marketPrice: 50000 }
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/leverage/);
+  });
+
+  it("rejects futures orders whose liquidation distance is too tight", async () => {
+    insertBot(db, { allocated_usdt: 100000 });
+    const rails = new SafetyRails({
+      db,
+      exchange: makeExchange(),
+      maxPriceDeviationPct: 5,
+      defaultDailyLossLimitUsdt: 50,
+      maxFuturesLeverage: 125,
+      minLiquidationDistancePct: 15
+    });
+    const result = await rails.checkOrder("bot-1", {
+      symbol: "BTC_USDT",
+      side: "BUY",
+      price: 50000,
+      quantity: 0.01,
+      futures: { leverage: 100, positionType: "long", maintenanceMarginRate: 0.005, marketPrice: 50000 }
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/liquidation/);
+  });
+
+  it("uses the caller-supplied marketPrice for the deviation check instead of the spot exchange client", async () => {
+    insertBot(db, { allocated_usdt: 100000 });
+    const rails = new SafetyRails({
+      db,
+      exchange: makeExchange(),
+      maxPriceDeviationPct: 5,
+      defaultDailyLossLimitUsdt: 50
+    });
+    const result = await rails.checkOrder("bot-1", {
+      symbol: "BTC_USDT",
+      side: "BUY",
+      price: 50000,
+      quantity: 0.01,
+      futures: { leverage: 5, positionType: "long", maintenanceMarginRate: 0.005, marketPrice: 60000 }
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/deviates/);
+  });
+});

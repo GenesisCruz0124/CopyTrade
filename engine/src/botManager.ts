@@ -5,12 +5,16 @@ import type { SafetyRails } from "./safety/safetyRails.js";
 import type { BotConfigInput } from "./config/botConfigSchema.js";
 import { GridStrategy } from "./strategies/grid/gridStrategy.js";
 import { DcaStrategy } from "./strategies/dca/dcaStrategy.js";
+import { FuturesGridStrategy } from "./strategies/grid/futuresGridStrategy.js";
+import { FuturesDcaStrategy } from "./strategies/dca/futuresDcaStrategy.js";
 import type { GridConfig, DcaConfig } from "./strategies/types.js";
 import { isLiveMode } from "./config/env.js";
+import type { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
+import type { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
 
 export interface BotRecord {
   id: string;
-  type: "grid" | "dca";
+  type: "grid" | "dca" | "futures_grid" | "futures_dca";
   symbol: string;
   status: "running" | "paused" | "stopped";
   config: Record<string, unknown>;
@@ -23,9 +27,16 @@ export interface BotRecord {
   updatedAt: number;
 }
 
+type AnyStrategy = GridStrategy | DcaStrategy | FuturesGridStrategy | FuturesDcaStrategy;
+
 interface BotEntry {
   record: BotRecord;
-  strategy: GridStrategy | DcaStrategy;
+  strategy: AnyStrategy;
+}
+
+export interface FuturesDeps {
+  futuresClient: FuturesRestClient;
+  futuresTrading: FuturesTradingService;
 }
 
 export class BotManager {
@@ -35,7 +46,8 @@ export class BotManager {
     private readonly db: Database.Database,
     private readonly exchange: ExchangeClient,
     private readonly safety: SafetyRails,
-    private readonly subscribeSymbol?: (symbol: string) => void
+    private readonly subscribeSymbol?: (symbol: string) => void,
+    private readonly futures?: FuturesDeps
   ) {
     this.loadExistingBots();
   }
@@ -46,7 +58,9 @@ export class BotManager {
       const record = this.rowToRecord(row);
       const strategy = this.buildStrategy(record);
       this.bots.set(record.id, { record, strategy });
-      if (record.status === "running") this.subscribeSymbol?.(record.symbol);
+      if (record.status === "running" && (record.type === "grid" || record.type === "dca")) {
+        this.subscribeSymbol?.(record.symbol);
+      }
     }
   }
 
@@ -54,10 +68,14 @@ export class BotManager {
     if (isLiveMode() && !input.confirmLive) {
       throw new Error("Live trading requires confirmLive: true on the bot config");
     }
+    if ((input.type === "futures_grid" || input.type === "futures_dca") && !this.futures) {
+      throw new Error("Futures trading is not configured on this engine (missing MEXC futures API credentials)");
+    }
 
     const id = randomUUID();
     const now = Date.now();
-    const allocatedUsdt = input.type === "grid" ? input.totalBudgetUsdt : input.amountUsdt * 100;
+    const allocatedUsdt =
+      input.type === "grid" || input.type === "futures_grid" ? input.totalBudgetUsdt : input.amountUsdt * 100;
 
     const record: BotRecord = {
       id,
@@ -74,10 +92,14 @@ export class BotManager {
       updatedAt: now
     };
 
+    const market = input.type.startsWith("futures_") ? "futures" : "spot";
+    const leverage = "leverage" in input ? input.leverage : null;
+    const marginMode = "marginMode" in input ? input.marginMode : null;
+
     this.db
       .prepare(
-        `INSERT INTO bots (id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at)
-         VALUES (@id, @type, @symbol, @status, @config, @state, @confirm_live, @allocated_usdt, @daily_loss_limit_usdt, @realized_pnl_usdt, @created_at, @updated_at)`
+        `INSERT INTO bots (id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at)
+         VALUES (@id, @type, @symbol, @status, @config, @state, @confirm_live, @allocated_usdt, @daily_loss_limit_usdt, @realized_pnl_usdt, @market, @leverage, @margin_mode, @created_at, @updated_at)`
       )
       .run({
         id: record.id,
@@ -90,35 +112,56 @@ export class BotManager {
         allocated_usdt: record.allocatedUsdt,
         daily_loss_limit_usdt: record.dailyLossLimitUsdt,
         realized_pnl_usdt: 0,
+        market,
+        leverage,
+        margin_mode: marginMode,
         created_at: now,
         updated_at: now
       });
 
     const strategy = this.buildStrategy(record);
     this.bots.set(id, { record, strategy });
-    this.subscribeSymbol?.(record.symbol);
+    if (record.type === "grid" || record.type === "dca") this.subscribeSymbol?.(record.symbol);
     return record;
   }
 
-  private buildStrategy(record: BotRecord): GridStrategy | DcaStrategy {
-    if (record.type === "grid") {
-      return new GridStrategy(record.id, record.config as unknown as GridConfig, {
-        db: this.db,
-        exchange: this.exchange,
-        safety: this.safety
-      });
+  private buildStrategy(record: BotRecord): AnyStrategy {
+    switch (record.type) {
+      case "grid":
+        return new GridStrategy(record.id, record.config as unknown as GridConfig, {
+          db: this.db,
+          exchange: this.exchange,
+          safety: this.safety
+        });
+      case "dca":
+        return new DcaStrategy(record.id, record.config as unknown as DcaConfig, {
+          db: this.db,
+          exchange: this.exchange,
+          safety: this.safety
+        });
+      case "futures_grid": {
+        if (!this.futures) throw new Error("Futures trading is not configured on this engine");
+        return new FuturesGridStrategy(record.id, record.config as unknown as GridConfig, {
+          db: this.db,
+          futuresClient: this.futures.futuresClient,
+          futuresTrading: this.futures.futuresTrading
+        });
+      }
+      case "futures_dca": {
+        if (!this.futures) throw new Error("Futures trading is not configured on this engine");
+        return new FuturesDcaStrategy(record.id, record.config as unknown as DcaConfig, {
+          db: this.db,
+          futuresClient: this.futures.futuresClient,
+          futuresTrading: this.futures.futuresTrading
+        });
+      }
     }
-    return new DcaStrategy(record.id, record.config as unknown as DcaConfig, {
-      db: this.db,
-      exchange: this.exchange,
-      safety: this.safety
-    });
   }
 
   async start(botId: string): Promise<void> {
     const entry = this.requireBot(botId);
     this.setStatus(botId, "running");
-    if (entry.strategy instanceof GridStrategy) {
+    if (entry.strategy instanceof GridStrategy || entry.strategy instanceof FuturesGridStrategy) {
       await entry.strategy.start();
     } else {
       entry.strategy.start();
@@ -127,19 +170,19 @@ export class BotManager {
 
   pause(botId: string): void {
     const entry = this.requireBot(botId);
-    if (entry.strategy instanceof DcaStrategy) entry.strategy.stop();
+    if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
     this.setStatus(botId, "paused");
   }
 
   stop(botId: string): void {
     const entry = this.requireBot(botId);
-    if (entry.strategy instanceof DcaStrategy) entry.strategy.stop();
+    if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
     this.setStatus(botId, "stopped");
   }
 
   remove(botId: string): void {
     const entry = this.requireBot(botId);
-    if (entry.strategy instanceof DcaStrategy) entry.strategy.stop();
+    if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
     this.db.prepare(`DELETE FROM bots WHERE id = ?`).run(botId);
     this.bots.delete(botId);
   }

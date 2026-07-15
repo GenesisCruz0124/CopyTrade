@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.copytrade.app.ui.botdetail.BotDetailScreen
+import com.copytrade.app.ui.copysignals.CopySignalsScreen
 import com.copytrade.app.ui.createbot.CreateBotScreen
 import com.copytrade.app.ui.dashboard.DashboardScreen
 import com.copytrade.app.ui.settings.SettingsScreen
@@ -31,8 +32,12 @@ fun CopyTradeNavGraph(startDestination: String) {
                 onOpenBot = { botId -> navController.navigate(Screen.BotDetail.route(botId)) },
                 onCreateBot = { navController.navigate(Screen.CreateBot.route) },
                 onOpenTradeLog = { navController.navigate(Screen.TradeLog.route) },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                onOpenCopySignals = { navController.navigate(Screen.CopySignals.route) }
             )
+        }
+        composable(Screen.CopySignals.route) {
+            CopySignalsScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = Screen.BotDetail.route,
