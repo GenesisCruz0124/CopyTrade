@@ -161,11 +161,14 @@ private fun PnlChartCard(state: BotDetailUiState) {
     }
 }
 
+/** Fixed-point, never scientific notation — Double.toString() switches to "1.7E-4" for small crypto quantities. */
+private fun formatQty(qty: Double): String = String.format(Locale.US, "%.8f", qty).trimEnd('0').trimEnd('.')
+
 @Composable
 private fun FillRow(fill: FillEntity) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "${fill.side} ${fill.quantity}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "${fill.side} ${formatQty(fill.quantity)}", style = MaterialTheme.typography.bodyMedium)
             Text(text = String.format(Locale.US, "@ %.4f", fill.price), style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -177,7 +180,7 @@ private fun OpenOrderRow(order: OrderDto) {
     val sideColor = if (order.side == "BUY") ProfitGreen else LossRed
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "${order.side} ${order.quantity}", color = sideColor, style = MaterialTheme.typography.bodyMedium)
+            Text(text = "${order.side} ${formatQty(order.quantity)}", color = sideColor, style = MaterialTheme.typography.bodyMedium)
             Text(
                 text = order.price?.let { String.format(Locale.US, "@ %.4f", it) } ?: order.type,
                 style = MaterialTheme.typography.bodyMedium
