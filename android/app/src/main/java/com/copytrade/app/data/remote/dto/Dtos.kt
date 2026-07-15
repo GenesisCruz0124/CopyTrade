@@ -228,8 +228,10 @@ data class FuturesPositionDto(
     @kotlinx.serialization.SerialName("stop_loss_price") val stopLossPrice: Double? = null,
     val status: String,
     @kotlinx.serialization.SerialName("close_price") val closePrice: Double? = null,
+    @kotlinx.serialization.SerialName("close_reason") val closeReason: String? = null,
     @kotlinx.serialization.SerialName("realized_pnl_usdt") val realizedPnlUsdt: Double? = null,
     @kotlinx.serialization.SerialName("created_at") val createdAt: Long,
+    @kotlinx.serialization.SerialName("closed_at") val closedAt: Long? = null,
     val currentPrice: Double? = null,
     val unrealizedPnlUsdt: Double? = null,
     val unrealizedPnlPercent: Double? = null
@@ -239,6 +241,13 @@ data class FuturesPositionDto(
 data class FuturesPositionsResponseDto(
     val mode: String,
     val positions: List<FuturesPositionDto> = emptyList()
+)
+
+@Serializable
+data class FuturesPriceDto(
+    val mode: String,
+    val symbol: String,
+    val price: Double
 )
 
 @Serializable

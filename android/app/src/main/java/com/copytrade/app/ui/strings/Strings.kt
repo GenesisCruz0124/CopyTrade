@@ -148,6 +148,15 @@ object Strings {
     val entryPrice = Bi("Entry", "Entry")
     val currentPriceLabel = Bi("Current", "Kasalukuyan")
     val positionOpened = Bi("Position opened", "Nabuksan ang position")
+    val futuresHistoryTitle = Bi("Futures history", "Futures history")
+    val openTab = Bi("Open", "Bukas")
+    val historyTab = Bi("History", "History")
+    val noPositionHistory = Bi("No closed positions yet", "Wala pang saradong position")
+    val closedAtLabel = Bi("Closed", "Sarado")
+    val realizedPnlLabel = Bi("Realized PnL", "Realized PnL")
+    val closeReasonManual = Bi("Manual", "Manual")
+    val closeReasonTakeProfit = Bi("Take-profit hit", "Naabot ang take-profit")
+    val closeReasonStopLoss = Bi("Stop-loss hit", "Naabot ang stop-loss")
 }
 
 @Composable

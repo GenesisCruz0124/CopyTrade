@@ -118,6 +118,10 @@ class EngineRepository(
 
     suspend fun closeFuturesPosition(id: String): FuturesPositionDto? = api.closeFuturesPosition(id).position
 
+    suspend fun getFuturesPositionsHistory(): List<FuturesPositionDto> = api.getFuturesPositionsHistory().positions
+
+    suspend fun getFuturesPrice(symbol: String): Double = api.getFuturesPrice(symbol).price
+
     private fun com.copytrade.app.data.remote.dto.BotDto.toEntity() = BotEntity(
         id = id,
         type = type,

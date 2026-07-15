@@ -207,12 +207,35 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     }
   });
 
+  app.get<{ Params: { symbol: string } }>("/futures/price/:symbol", async (req, reply) => {
+    if (!deps.futures) {
+      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      return;
+    }
+    try {
+      const ticker = await deps.futures.futuresClient.ticker(req.params.symbol);
+      reply.send({ mode: modeOf(), symbol: ticker.symbol, price: ticker.fairPrice });
+    } catch (err) {
+      reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
   app.get("/futures/positions", async (_req, reply) => {
     if (!deps.futuresPositions) {
       reply.send({ mode: modeOf(), positions: [] });
       return;
     }
     const positions = await deps.futuresPositions.listOpen();
+    reply.send({ mode: modeOf(), positions });
+  });
+
+  app.get<{ Querystring: { limit?: string } }>("/futures/positions/history", async (req, reply) => {
+    if (!deps.futuresPositions) {
+      reply.send({ mode: modeOf(), positions: [] });
+      return;
+    }
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+    const positions = deps.futuresPositions.listClosed(limit);
     reply.send({ mode: modeOf(), positions });
   });
 

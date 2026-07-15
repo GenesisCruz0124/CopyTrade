@@ -8,6 +8,7 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object CopySignals : Screen("copy_signals")
     data object Futures : Screen("futures")
+    data object FuturesHistory : Screen("futures_history")
     data object BotDetail : Screen("bot_detail/{botId}") {
         fun route(botId: String) = "bot_detail/$botId"
     }
