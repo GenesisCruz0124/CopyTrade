@@ -1,4 +1,5 @@
 export type GridMode = "arithmetic" | "geometric";
+export type MarginMode = "isolated" | "cross";
 
 export interface GridConfig {
   symbol: string;
@@ -7,6 +8,9 @@ export interface GridConfig {
   gridLevels: number; // 2-50
   totalBudgetUsdt: number;
   mode: GridMode;
+  /** Present only for futures_grid bots. */
+  leverage?: number;
+  marginMode?: MarginMode;
 }
 
 export type DcaInterval = "hourly" | "daily" | "weekly" | "custom";
@@ -20,6 +24,9 @@ export interface DcaConfig {
   dipThresholdPct?: number; // e.g. 5 => trigger when 24h change < -5%
   takeProfitPct?: number; // sell accumulated position at this % gain
   orderStyle?: "market" | "limitAtAsk";
+  /** Present only for futures_dca bots. */
+  leverage?: number;
+  marginMode?: MarginMode;
 }
 
 export interface GridLevelState {

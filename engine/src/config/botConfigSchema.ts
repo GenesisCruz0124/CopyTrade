@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+const leverageSchema = z.number().int().min(1).max(125);
+const marginModeSchema = z.enum(["isolated", "cross"]);
+
 export const gridConfigSchema = z.object({
   type: z.literal("grid"),
   symbol: z.string().min(1),
@@ -10,6 +13,12 @@ export const gridConfigSchema = z.object({
   mode: z.enum(["arithmetic", "geometric"]),
   dailyLossLimitUsdt: z.number().positive().optional(),
   confirmLive: z.boolean().optional().default(false)
+});
+
+export const futuresGridConfigSchema = gridConfigSchema.extend({
+  type: z.literal("futures_grid"),
+  leverage: leverageSchema,
+  marginMode: marginModeSchema.optional().default("isolated")
 });
 
 export const dcaConfigSchema = z.object({
@@ -26,10 +35,16 @@ export const dcaConfigSchema = z.object({
   confirmLive: z.boolean().optional().default(false)
 });
 
+export const futuresDcaConfigSchema = dcaConfigSchema.extend({
+  type: z.literal("futures_dca"),
+  leverage: leverageSchema,
+  marginMode: marginModeSchema.optional().default("isolated")
+});
+
 export const botConfigSchema = z
-  .discriminatedUnion("type", [gridConfigSchema, dcaConfigSchema])
+  .discriminatedUnion("type", [gridConfigSchema, dcaConfigSchema, futuresGridConfigSchema, futuresDcaConfigSchema])
   .superRefine((cfg, ctx) => {
-    if (cfg.type === "dca" && cfg.interval === "custom" && !cfg.cronExpression) {
+    if ((cfg.type === "dca" || cfg.type === "futures_dca") && cfg.interval === "custom" && !cfg.cronExpression) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "cronExpression is required when interval is 'custom'",

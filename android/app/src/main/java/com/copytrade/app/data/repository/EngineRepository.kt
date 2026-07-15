@@ -9,6 +9,7 @@ import com.copytrade.app.data.local.entity.EventEntity
 import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.local.entity.PnlSnapshotEntity
 import com.copytrade.app.data.remote.ApiService
+import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.StatusDto
@@ -91,6 +92,12 @@ class EngineRepository(
         api.killSwitch()
         refreshBots()
     }
+
+    suspend fun getCopySignals(status: String? = null): List<CopySignalDto> = api.getCopySignals(status).signals
+
+    suspend fun approveCopySignal(id: String): CopySignalDto? = api.approveCopySignal(id).signal
+
+    suspend fun rejectCopySignal(id: String): CopySignalDto? = api.rejectCopySignal(id).signal
 
     private fun com.copytrade.app.data.remote.dto.BotDto.toEntity() = BotEntity(
         id = id,

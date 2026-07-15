@@ -1,12 +1,22 @@
 import type Database from "better-sqlite3";
 import type { ExchangeClient } from "../exchange/ExchangeClient.js";
 import { logger } from "../logger.js";
+import { liquidationDistancePct } from "../mexcFutures/liquidation.js";
 
 export interface OrderCheckInput {
   symbol: string;
   side: "BUY" | "SELL";
   price: number;
   quantity: number;
+  /** Present only for futures orders; triggers leverage/liquidation checks. */
+  futures?: {
+    leverage: number;
+    positionType: "long" | "short";
+    maintenanceMarginRate: number;
+    /** Futures symbols (e.g. BTC_USDT) aren't known to the spot exchange client, so the
+     *  caller supplies the current mark/last price for the deviation check instead. */
+    marketPrice: number;
+  };
 }
 
 export interface OrderCheckResult {
@@ -27,6 +37,8 @@ export interface SafetyRailsOptions {
   exchange: ExchangeClient;
   maxPriceDeviationPct: number;
   defaultDailyLossLimitUsdt: number;
+  maxFuturesLeverage?: number;
+  minLiquidationDistancePct?: number;
 }
 
 /**
@@ -66,14 +78,18 @@ export class SafetyRails {
       }
     }
 
-    let ticker;
-    try {
-      ticker = await this.opts.exchange.getTickerPrice(order.symbol);
-    } catch (err) {
-      logger.warn({ err, symbol: order.symbol }, "safety check: could not fetch ticker; rejecting order");
-      return { allowed: false, reason: "could not verify market price" };
+    let marketPrice: number;
+    if (order.futures) {
+      marketPrice = order.futures.marketPrice;
+    } else {
+      try {
+        marketPrice = (await this.opts.exchange.getTickerPrice(order.symbol)).price;
+      } catch (err) {
+        logger.warn({ err, symbol: order.symbol }, "safety check: could not fetch ticker; rejecting order");
+        return { allowed: false, reason: "could not verify market price" };
+      }
     }
-    const deviationPct = Math.abs((order.price - ticker.price) / ticker.price) * 100;
+    const deviationPct = Math.abs((order.price - marketPrice) / marketPrice) * 100;
     if (deviationPct > this.opts.maxPriceDeviationPct) {
       return {
         allowed: false,
@@ -81,9 +97,33 @@ export class SafetyRails {
       };
     }
 
-    const balanceOk = await this.hasSufficientBalance(order);
-    if (!balanceOk) {
-      return { allowed: false, reason: "insufficient balance" };
+    if (order.futures) {
+      const maxLeverage = this.opts.maxFuturesLeverage ?? 20;
+      if (order.futures.leverage > maxLeverage) {
+        return { allowed: false, reason: `leverage ${order.futures.leverage}x exceeds max allowed ${maxLeverage}x` };
+      }
+      const minDistancePct = this.opts.minLiquidationDistancePct ?? 15;
+      const distancePct = liquidationDistancePct(
+        order.price,
+        order.futures.leverage,
+        order.futures.maintenanceMarginRate,
+        order.futures.positionType
+      );
+      if (distancePct < minDistancePct) {
+        return {
+          allowed: false,
+          reason: `estimated liquidation is only ${distancePct.toFixed(2)}% from entry, below the required ${minDistancePct}% buffer`
+        };
+      }
+    }
+
+    if (!order.futures) {
+      // Futures margin balance is checked by the futures order-placement path itself
+      // (spot exchangeInfo/account lookups below don't apply to contract symbols).
+      const balanceOk = await this.hasSufficientBalance(order);
+      if (!balanceOk) {
+        return { allowed: false, reason: "insufficient balance" };
+      }
     }
 
     return { allowed: true };

@@ -47,8 +47,10 @@ In CI, the same file is written from GitHub Actions secrets (see `.github/workfl
 
 ## Screens
 
-Setup/Login → Dashboard (balances, bot cards, kill switch) → Bot detail (PnL chart via Vico, orders, fills, start/pause/stop) → Create bot (Grid or DCA form) → Trade log (filterable fills, cached in Room) → Settings (language, server, about).
+Setup/Login → Dashboard (balances, bot cards, kill switch, notification icon → Copy Signals) → Bot detail (PnL chart via Vico, orders, fills, start/pause/stop; supports spot and futures bots) → Create bot (Grid or DCA form) → Copy Signals (pending Discord-sourced futures signals — thumbnail + parsed fields, Approve/Reject; approving places a real order sized from the engine's copy-trading budget) → Trade log (filterable fills, cached in Room) → Settings (language, server, about).
+
+Copy-signal thumbnails are loaded via Coil using an authenticated OkHttp client (same bearer token as the API), since the image lives behind `/copy-signals/:id/image` on the engine.
 
 ## Out of scope for v1
 
-Futures/margin, copying other traders' accounts, multi-user support — matches the engine's scope.
+Multi-user support, automatic SL/TP order placement for copy trades, subscribing to another account's live position feed.

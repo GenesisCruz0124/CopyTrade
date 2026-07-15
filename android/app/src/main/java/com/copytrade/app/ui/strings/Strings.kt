@@ -101,6 +101,22 @@ object Strings {
     val retry = Bi("Retry", "Ulitin")
     val loading = Bi("Loading…", "Naglo-load…")
     val error = Bi("Something went wrong", "May nagkamali")
+
+    // Copy signals
+    val copySignalsTitle = Bi("Copy signals", "Copy signals")
+    val noPendingSignals = Bi("No pending signals", "Walang pending na signal")
+    val approve = Bi("Approve", "Aprubahan")
+    val reject = Bi("Reject", "Tanggihan")
+    val approveConfirmTitle = Bi("Approve this signal?", "Aaprubahan ang signal na ito?")
+    val approveConfirmMessage = Bi(
+        "This will open a real futures position sized from your copy-trading budget.",
+        "Magbubukas ito ng totoong futures position gamit ang iyong copy-trading budget."
+    )
+    val signalConfidence = Bi("Confidence", "Confidence")
+    val signalPending = Bi("Pending", "Pending")
+    val signalExecuted = Bi("Executed", "Naisagawa")
+    val signalFailed = Bi("Failed", "Nabigo")
+    val signalRejected = Bi("Rejected", "Tinanggihan")
 }
 
 @Composable
