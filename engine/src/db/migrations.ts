@@ -101,6 +101,7 @@ export function runMigrations(db: Database.Database): void {
       margin_usdt REAL NOT NULL,
       take_profit_price REAL,
       stop_loss_price REAL,
+      risk_usdt REAL,
       status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
       close_price REAL,
       close_reason TEXT,
@@ -120,6 +121,15 @@ export function runMigrations(db: Database.Database): void {
   `);
 
   migrateBotsTableForFutures(db);
+  migrateFuturesPositionsRiskColumn(db);
+}
+
+/** risk_usdt is a plain nullable REAL column added after futures_positions already
+ *  shipped — no CHECK constraint involved, so a simple ALTER TABLE covers it. */
+function migrateFuturesPositionsRiskColumn(db: Database.Database): void {
+  const columns = db.prepare(`PRAGMA table_info(futures_positions)`).all() as { name: string }[];
+  if (columns.some((c) => c.name === "risk_usdt")) return;
+  db.exec(`ALTER TABLE futures_positions ADD COLUMN risk_usdt REAL`);
 }
 
 /**

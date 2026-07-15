@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -98,7 +99,8 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (state.notConfigured) {
@@ -268,6 +270,14 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
         )
+        OutlinedTextField(
+            value = state.riskUsdAmount,
+            onValueChange = viewModel::setRiskUsdAmount,
+            label = { Text(Strings.riskUsdAmountLabel.resolve()) },
+            supportingText = { Text(Strings.riskUsdAmountHint.resolve()) },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth()
+        )
 
         if (state.mode == "live") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -323,6 +333,13 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
                     color = pnlColor,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
+                )
+            }
+            position.riskUsdt?.let {
+                Text(
+                    "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {

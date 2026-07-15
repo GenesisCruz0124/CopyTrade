@@ -27,6 +27,7 @@ export interface FuturesPositionRow {
   margin_usdt: number;
   take_profit_price: number | null;
   stop_loss_price: number | null;
+  risk_usdt: number | null;
   status: "open" | "closed";
   close_price: number | null;
   close_reason: string | null;
@@ -85,6 +86,44 @@ export class FuturesPositionManager {
     if (marginUsdt <= 0) throw new Error("computed margin amount is zero or negative");
 
     const price = ticker.fairPrice;
+
+    // Validate TP/SL against the current price BEFORE placing anything — a bad
+    // percentage (e.g. a stop-loss of 100%+ that implies a negative price) must
+    // reject the request outright rather than open a position with no working stop.
+    if (input.takeProfitPercent != null && input.takeProfitPercent <= 0) {
+      throw new Error("take-profit percent must be greater than 0");
+    }
+    if (input.stopLossPercent != null && (input.stopLossPercent <= 0 || input.stopLossPercent >= 100)) {
+      throw new Error("stop-loss percent must be greater than 0 and less than 100");
+    }
+    const takeProfitPrice =
+      input.takeProfitPercent != null
+        ? input.side === "long"
+          ? price * (1 + input.takeProfitPercent / 100)
+          : price * (1 - input.takeProfitPercent / 100)
+        : null;
+    const stopLossPrice =
+      input.stopLossPercent != null
+        ? input.side === "long"
+          ? price * (1 - input.stopLossPercent / 100)
+          : price * (1 + input.stopLossPercent / 100)
+        : null;
+    if (takeProfitPrice != null && takeProfitPrice <= 0) {
+      throw new Error("take-profit percent is too large — would result in a non-positive price");
+    }
+    if (stopLossPrice != null && stopLossPrice <= 0) {
+      throw new Error("stop-loss percent is too large — would result in a non-positive price");
+    }
+    if (
+      takeProfitPrice != null &&
+      stopLossPrice != null &&
+      (input.side === "long"
+        ? !(stopLossPrice < price && price < takeProfitPrice)
+        : !(takeProfitPrice < price && price < stopLossPrice))
+    ) {
+      throw new Error("take-profit and stop-loss must be on the correct side of the current price");
+    }
+
     const notional = marginUsdt * input.leverage;
     const rawQty = notional / (price * detail.contractSize);
     const qty = floorToStep(rawQty, detail.volUnit || 1);
@@ -103,18 +142,7 @@ export class FuturesPositionManager {
       externalOid
     });
 
-    const takeProfitPrice =
-      input.takeProfitPercent != null
-        ? input.side === "long"
-          ? price * (1 + input.takeProfitPercent / 100)
-          : price * (1 - input.takeProfitPercent / 100)
-        : null;
-    const stopLossPrice =
-      input.stopLossPercent != null
-        ? input.side === "long"
-          ? price * (1 - input.stopLossPercent / 100)
-          : price * (1 + input.stopLossPercent / 100)
-        : null;
+    const riskUsdt = input.stopLossPercent != null ? marginUsdt * input.leverage * (input.stopLossPercent / 100) : null;
 
     const id = randomUUID();
     const now = Date.now();
@@ -130,6 +158,7 @@ export class FuturesPositionManager {
       margin_usdt: marginUsdt,
       take_profit_price: takeProfitPrice,
       stop_loss_price: stopLossPrice,
+      risk_usdt: riskUsdt,
       status: "open",
       close_price: null,
       close_reason: null,
@@ -144,9 +173,9 @@ export class FuturesPositionManager {
       .prepare(
         `INSERT INTO futures_positions
            (id, symbol, side, leverage, open_type, entry_price, quantity, contract_size, margin_usdt,
-            take_profit_price, stop_loss_price, status, order_id, created_at, updated_at)
+            take_profit_price, stop_loss_price, risk_usdt, status, order_id, created_at, updated_at)
          VALUES (@id, @symbol, @side, @leverage, @open_type, @entry_price, @quantity, @contract_size, @margin_usdt,
-                 @take_profit_price, @stop_loss_price, @status, @order_id, @created_at, @updated_at)`
+                 @take_profit_price, @stop_loss_price, @risk_usdt, @status, @order_id, @created_at, @updated_at)`
       )
       .run(row);
 
