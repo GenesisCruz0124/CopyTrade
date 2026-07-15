@@ -119,6 +119,13 @@ private fun ConfigSummaryCard(state: BotDetailUiState) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "${bot.symbol} · ${bot.type.uppercase(Locale.US)}", style = MaterialTheme.typography.titleLarge)
+            state.currentPrice?.let {
+                Text(
+                    text = String.format(Locale.US, "Current price: %.2f", it),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
             Text(text = "Budget: ${bot.allocatedUsdt} USDT", style = MaterialTheme.typography.bodyMedium)
             val pnlColor = if (bot.realizedPnlUsdt >= 0) ProfitGreen else LossRed
             Text(

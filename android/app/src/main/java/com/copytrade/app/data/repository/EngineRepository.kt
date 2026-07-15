@@ -77,6 +77,8 @@ class EngineRepository(
 
     suspend fun getOpenOrders(botId: String) = api.getOrders(botId).orders
 
+    suspend fun getPrice(symbol: String) = api.getPrice(symbol).price
+
     suspend fun refreshPnl(botId: String) {
         val response = api.getPnl(botId)
         pnlDao.upsertAll(response.series.map { it.toEntity(botId) })
