@@ -27,6 +27,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -35,7 +37,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -57,11 +61,17 @@ import kotlin.math.abs
 fun FuturesScreen(onBack: () -> Unit) {
     val viewModel = appViewModel { FuturesViewModel(it) }
     val state by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val positionOpenedMessage = Strings.positionOpened.resolve()
 
     PollWhileForeground { viewModel.refresh() }
 
     LaunchedEffect(state.opened) {
-        if (state.opened) viewModel.consumeOpened()
+        if (state.opened) {
+            scope.launch { snackbarHostState.showSnackbar(positionOpenedMessage) }
+            viewModel.consumeOpened()
+        }
     }
 
     Scaffold(
@@ -72,7 +82,8 @@ fun FuturesScreen(onBack: () -> Unit) {
                     IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
