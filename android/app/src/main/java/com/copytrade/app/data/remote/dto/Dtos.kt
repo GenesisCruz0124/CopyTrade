@@ -185,6 +185,83 @@ data class CopySignalResponseDto(
 )
 
 @Serializable
+data class FuturesSymbolDto(
+    val symbol: String,
+    val baseCoin: String,
+    val quoteCoin: String,
+    val maxLeverage: Double
+)
+
+@Serializable
+data class FuturesSymbolsResponseDto(
+    val mode: String,
+    val symbols: List<FuturesSymbolDto> = emptyList(),
+    val error: String? = null
+)
+
+@Serializable
+data class FuturesBalanceDto(
+    val currency: String,
+    val availableBalance: Double,
+    val positionMargin: Double,
+    val equity: Double
+)
+
+@Serializable
+data class FuturesBalanceResponseDto(
+    val mode: String,
+    val balance: FuturesBalanceDto? = null,
+    val error: String? = null
+)
+
+@Serializable
+data class FuturesPositionDto(
+    val id: String,
+    val symbol: String,
+    val side: String,
+    val leverage: Double,
+    @kotlinx.serialization.SerialName("open_type") val openType: String,
+    @kotlinx.serialization.SerialName("entry_price") val entryPrice: Double,
+    val quantity: Double,
+    @kotlinx.serialization.SerialName("margin_usdt") val marginUsdt: Double,
+    @kotlinx.serialization.SerialName("take_profit_price") val takeProfitPrice: Double? = null,
+    @kotlinx.serialization.SerialName("stop_loss_price") val stopLossPrice: Double? = null,
+    val status: String,
+    @kotlinx.serialization.SerialName("close_price") val closePrice: Double? = null,
+    @kotlinx.serialization.SerialName("realized_pnl_usdt") val realizedPnlUsdt: Double? = null,
+    @kotlinx.serialization.SerialName("created_at") val createdAt: Long,
+    val currentPrice: Double? = null,
+    val unrealizedPnlUsdt: Double? = null,
+    val unrealizedPnlPercent: Double? = null
+)
+
+@Serializable
+data class FuturesPositionsResponseDto(
+    val mode: String,
+    val positions: List<FuturesPositionDto> = emptyList()
+)
+
+@Serializable
+data class FuturesPositionResponseDto(
+    val mode: String,
+    val position: FuturesPositionDto? = null,
+    val error: String? = null
+)
+
+@Serializable
+data class OpenFuturesPositionRequest(
+    val symbol: String,
+    val side: String,
+    val leverage: Double,
+    val openType: String = "isolated",
+    val amountUsd: Double? = null,
+    val percentOfBalance: Double? = null,
+    val takeProfitPercent: Double? = null,
+    val stopLossPercent: Double? = null,
+    val confirmLive: Boolean = false
+)
+
+@Serializable
 @OptIn(ExperimentalSerializationApi::class)
 data class CreateDcaBotRequest(
     @EncodeDefault val type: String = "dca",

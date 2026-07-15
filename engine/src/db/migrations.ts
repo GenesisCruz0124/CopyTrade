@@ -89,6 +89,29 @@ export function runMigrations(db: Database.Database): void {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS futures_positions (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL CHECK (side IN ('long', 'short')),
+      leverage REAL NOT NULL,
+      open_type TEXT NOT NULL CHECK (open_type IN ('isolated', 'cross')),
+      entry_price REAL NOT NULL,
+      quantity REAL NOT NULL,
+      contract_size REAL NOT NULL,
+      margin_usdt REAL NOT NULL,
+      take_profit_price REAL,
+      stop_loss_price REAL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+      close_price REAL,
+      close_reason TEXT,
+      realized_pnl_usdt REAL,
+      order_id TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      closed_at INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_futures_positions_status ON futures_positions(status);
     CREATE INDEX IF NOT EXISTS idx_orders_bot_id ON orders(bot_id);
     CREATE INDEX IF NOT EXISTS idx_fills_bot_id ON fills(bot_id);
     CREATE INDEX IF NOT EXISTS idx_pnl_bot_id ON pnl_snapshots(bot_id);

@@ -92,6 +92,7 @@ object Strings {
     val taglish = Bi("Taglish", "Taglish")
     val serverSettings = Bi("Server settings", "Server settings")
     val about = Bi("About", "Tungkol dito")
+    val appVersion = Bi("App version", "Bersyon ng app")
     val aboutBody = Bi(
         "CopyTrade controls a self-hosted MEXC Spot grid/DCA engine. No analytics, no trackers.",
         "Kinokontrol ng CopyTrade ang sarili mong MEXC Spot grid/DCA engine. Walang analytics, walang tracker."
@@ -118,6 +119,35 @@ object Strings {
     val signalExecuted = Bi("Executed", "Naisagawa")
     val signalFailed = Bi("Failed", "Nabigo")
     val signalRejected = Bi("Rejected", "Tinanggihan")
+
+    // Futures trading
+    val futuresTitle = Bi("Futures trading", "Futures trading")
+    val futuresNotConfigured = Bi(
+        "Futures trading is not configured on this engine.",
+        "Hindi pa naka-configure ang futures trading sa engine na ito."
+    )
+    val tokenPair = Bi("Token pair", "Token pair")
+    val searchTokenPair = Bi("Search token pair (e.g. BTC_USDT)", "Maghanap ng token pair (e.g. BTC_USDT)")
+    val openLong = Bi("Open long", "Open long")
+    val openShort = Bi("Open short", "Open short")
+    val leverage = Bi("Leverage", "Leverage")
+    val marginMode = Bi("Margin mode", "Margin mode")
+    val isolated = Bi("Isolated", "Isolated")
+    val cross = Bi("Cross", "Cross")
+    val sizeByUsd = Bi("Fixed USD amount", "Fixed na halaga sa USD")
+    val sizeByPercent = Bi("% of balance", "% ng balance")
+    val amountUsdLabel = Bi("Amount (USDT)", "Halaga (USDT)")
+    val percentOfBalanceLabel = Bi("Percent of balance (%)", "Porsyento ng balance (%)")
+    val takeProfitPercentLabel = Bi("Take-profit (%)", "Take-profit (%)")
+    val stopLossPercentLabel = Bi("Stop-loss (%)", "Stop-loss (%)")
+    val availableBalance = Bi("Available balance", "Available na balance")
+    val openPosition = Bi("Open position", "Buksan ang position")
+    val closePosition = Bi("Close", "Isara")
+    val openPositions = Bi("Open positions", "Mga bukas na position")
+    val noOpenPositions = Bi("No open positions", "Walang bukas na position")
+    val entryPrice = Bi("Entry", "Entry")
+    val currentPriceLabel = Bi("Current", "Kasalukuyan")
+    val positionOpened = Bi("Position opened", "Nabuksan ang position")
 }
 
 @Composable

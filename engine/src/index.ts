@@ -14,6 +14,7 @@ import { BotManager, type FuturesDeps } from "./botManager.js";
 import { startServer } from "./api/server.js";
 import { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
 import { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
+import { FuturesPositionManager } from "./mexcFutures/futuresPositionManager.js";
 import { DiscordSignalListener } from "./discord/discordSignalListener.js";
 import { SignalExtractor } from "./vision/signalExtractor.js";
 import { CopySignalService } from "./copySignals/copySignalService.js";
@@ -62,6 +63,7 @@ async function main() {
   }
 
   let futures: FuturesDeps | undefined;
+  let futuresPositions: FuturesPositionManager | undefined;
   if (isFuturesConfigured()) {
     const futuresClient = new FuturesRestClient({
       accessKey: env.MEXC_FUTURES_ACCESS_KEY,
@@ -69,6 +71,7 @@ async function main() {
     });
     const futuresTrading = new FuturesTradingService(futuresClient, safety);
     futures = { futuresClient, futuresTrading };
+    futuresPositions = new FuturesPositionManager(db, futuresClient, safety, env.MAX_FUTURES_LEVERAGE);
     logger.info("MEXC futures trading configured");
   } else {
     logger.info("MEXC_FUTURES_ACCESS_KEY/SECRET_KEY not set — futures bots disabled");
@@ -93,6 +96,14 @@ async function main() {
   const reconcileTimer = setInterval(() => {
     botManager.reconcileAll().catch((err) => logger.error({ err }, "reconcileAll failed"));
   }, 5000);
+
+  // Same rationale as reconcileTimer above: manual futures positions need their
+  // TP/SL checked against live price on a poll, since there's no fill push.
+  const futuresMonitorTimer = futuresPositions
+    ? setInterval(() => {
+        futuresPositions!.monitor().catch((err) => logger.error({ err }, "futures position monitor failed"));
+      }, 5000)
+    : undefined;
 
   let copySignals: CopySignalService | undefined;
   let discordListener: DiscordSignalListener | undefined;
@@ -128,13 +139,24 @@ async function main() {
   const fxRates = new FxRateService();
   fxRates.start();
 
-  const app = await startServer({ db, exchange, safety, botManager, startedAt: Date.now(), copySignals, fxRates });
+  const app = await startServer({
+    db,
+    exchange,
+    safety,
+    botManager,
+    startedAt: Date.now(),
+    copySignals,
+    fxRates,
+    futures,
+    futuresPositions
+  });
 
   const shutdown = async () => {
     logger.info("shutting down");
     ws.close();
     pricePoller?.stop();
     clearInterval(reconcileTimer);
+    if (futuresMonitorTimer) clearInterval(futuresMonitorTimer);
     fxRates.stop();
     discordListener?.close();
     await app.close();

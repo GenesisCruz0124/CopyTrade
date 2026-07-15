@@ -12,6 +12,10 @@ import com.copytrade.app.data.remote.ApiService
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
+import com.copytrade.app.data.remote.dto.FuturesBalanceDto
+import com.copytrade.app.data.remote.dto.FuturesPositionDto
+import com.copytrade.app.data.remote.dto.FuturesSymbolDto
+import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.StatusDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
@@ -102,6 +106,17 @@ class EngineRepository(
     suspend fun approveCopySignal(id: String): CopySignalDto? = api.approveCopySignal(id).signal
 
     suspend fun rejectCopySignal(id: String): CopySignalDto? = api.rejectCopySignal(id).signal
+
+    suspend fun getFuturesSymbols(): List<FuturesSymbolDto> = api.getFuturesSymbols().symbols
+
+    suspend fun getFuturesBalance(): FuturesBalanceDto? = api.getFuturesBalance().balance
+
+    suspend fun getFuturesPositions(): List<FuturesPositionDto> = api.getFuturesPositions().positions
+
+    suspend fun openFuturesPosition(request: OpenFuturesPositionRequest): FuturesPositionDto? =
+        api.openFuturesPosition(request).position
+
+    suspend fun closeFuturesPosition(id: String): FuturesPositionDto? = api.closeFuturesPosition(id).position
 
     private fun com.copytrade.app.data.remote.dto.BotDto.toEntity() = BotEntity(
         id = id,

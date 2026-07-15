@@ -11,6 +11,7 @@ import com.copytrade.app.ui.botdetail.BotDetailScreen
 import com.copytrade.app.ui.copysignals.CopySignalsScreen
 import com.copytrade.app.ui.createbot.CreateBotScreen
 import com.copytrade.app.ui.dashboard.DashboardScreen
+import com.copytrade.app.ui.futures.FuturesScreen
 import com.copytrade.app.ui.settings.SettingsScreen
 import com.copytrade.app.ui.setup.SetupScreen
 import com.copytrade.app.ui.tradelog.TradeLogScreen
@@ -33,11 +34,15 @@ fun CopyTradeNavGraph(startDestination: String) {
                 onCreateBot = { navController.navigate(Screen.CreateBot.route) },
                 onOpenTradeLog = { navController.navigate(Screen.TradeLog.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
-                onOpenCopySignals = { navController.navigate(Screen.CopySignals.route) }
+                onOpenCopySignals = { navController.navigate(Screen.CopySignals.route) },
+                onOpenFutures = { navController.navigate(Screen.Futures.route) }
             )
         }
         composable(Screen.CopySignals.route) {
             CopySignalsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Screen.Futures.route) {
+            FuturesScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = Screen.BotDetail.route,
