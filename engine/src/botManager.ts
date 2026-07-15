@@ -11,6 +11,7 @@ import type { GridConfig, DcaConfig } from "./strategies/types.js";
 import { isLiveMode } from "./config/env.js";
 import type { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
 import type { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
+import { logger } from "./logger.js";
 
 export interface BotRecord {
   id: string;
@@ -61,6 +62,33 @@ export class BotManager {
       if (record.status === "running" && (record.type === "grid" || record.type === "dca")) {
         this.subscribeSymbol?.(record.symbol);
       }
+      if (record.status === "running") {
+        this.restartRunningBotOnBoot(record, strategy);
+      }
+    }
+  }
+
+  /**
+   * A bot whose DB status is "running" survives a process restart, but its
+   * in-memory strategy does not — nothing was actually placing orders for it
+   * until this ran. In paper mode the simulated exchange is always empty on
+   * boot anyway, so re-placing orders here is both safe and necessary. In
+   * live mode blindly re-placing orders on top of whatever's already open on
+   * the real exchange would be dangerous, so we only warn and require a
+   * manual stop/start there instead.
+   */
+  private restartRunningBotOnBoot(record: BotRecord, strategy: AnyStrategy): void {
+    if (isLiveMode()) {
+      logger.warn(
+        { botId: record.id, type: record.type },
+        "bot was running before restart; live mode does not auto-resume order placement — stop and start it manually to reconcile"
+      );
+      return;
+    }
+    if (strategy instanceof GridStrategy || strategy instanceof FuturesGridStrategy) {
+      strategy.start().catch((err) => logger.error({ err, botId: record.id }, "failed to resume grid bot after restart"));
+    } else if (strategy instanceof DcaStrategy || strategy instanceof FuturesDcaStrategy) {
+      strategy.start();
     }
   }
 
