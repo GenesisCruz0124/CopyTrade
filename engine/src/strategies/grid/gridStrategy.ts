@@ -55,14 +55,46 @@ export class GridStrategy {
     this.emitEvent("grid_started", `Grid started for ${this.config.symbol} with ${prices.length} levels`);
   }
 
-  /** Call when a fill notification arrives for a tracked order (from WS or reconciliation). */
-  async onOrderFilled(clientOrderId: string, filledQty: number): Promise<void> {
+  /**
+   * Polls every open level's order for a fill. There is no push-based fill
+   * notification wired up for either paper or live orders yet, so this must
+   * be called periodically (see index.ts) for the grid to ever progress past
+   * its initial orders.
+   */
+  async reconcile(): Promise<void> {
+    const { exchange } = this.deps;
+    for (const level of this.levels) {
+      if (level.status !== "OPEN" || !level.orderId) continue;
+      let result;
+      try {
+        result = await exchange.queryOrder(this.config.symbol, level.orderId, level.clientOrderId);
+      } catch (err) {
+        logger.warn({ err, level: level.level, botId: this.botId }, "failed to query grid order during reconcile");
+        continue;
+      }
+      if (result.status === "FILLED") {
+        await this.onOrderFilled(level.clientOrderId!, result.executedQty, result.price);
+      }
+    }
+  }
+
+  /** Handles a fill: persists it, updates the level, and places the opposite-side order one level away. */
+  private async onOrderFilled(clientOrderId: string, filledQty: number, fillPrice: number): Promise<void> {
     const level = this.levels.find((l) => l.clientOrderId === clientOrderId);
-    if (!level) return;
+    if (!level || level.status === "FILLED") return;
 
     level.status = "FILLED";
     this.persistState();
+    this.persistFill(level, filledQty, fillPrice);
     this.emitEvent("order_filled", `Level ${level.level} (${level.side}) filled`, { clientOrderId, filledQty });
+
+    if (level.side === "SELL") {
+      const costBasis = this.estimateMatchedBuyPrice(level);
+      if (costBasis !== null) {
+        const pnl = (fillPrice - costBasis) * filledQty;
+        this.deps.safety.recordRealizedPnl(this.botId, pnl);
+      }
+    }
 
     const nextLevel =
       level.side === "BUY"
@@ -74,6 +106,12 @@ export class GridStrategy {
     nextLevel.side = level.side === "BUY" ? "SELL" : "BUY";
     nextLevel.status = "PENDING";
     await this.placeLevelOrder(nextLevel, filledQty);
+  }
+
+  /** Best-effort cost basis for a sell fill: the price of the level directly below it, which is what would have been bought to stock this level. */
+  private estimateMatchedBuyPrice(sellLevel: GridLevelState): number | null {
+    const buyLevel = this.levels[sellLevel.level - 1];
+    return buyLevel ? buyLevel.price : null;
   }
 
   private async placeLevelOrder(level: GridLevelState, quantity: number): Promise<void> {
@@ -114,7 +152,60 @@ export class GridStrategy {
     });
     level.orderId = result.orderId;
     this.persistState();
+    this.persistOrder(level, validated.price, validated.quantity);
     this.emitEvent("order_placed", `Placed ${level.side} at level ${level.level} @ ${validated.price}`);
+  }
+
+  private persistOrder(level: GridLevelState, price: number, quantity: number): void {
+    const now = Date.now();
+    this.deps.db
+      .prepare(
+        `INSERT INTO orders (id, bot_id, client_order_id, exchange_order_id, symbol, side, type, price, quantity, status, grid_level, created_at, updated_at)
+         VALUES (@id, @bot_id, @client_order_id, @exchange_order_id, @symbol, @side, 'LIMIT', @price, @quantity, 'NEW', @grid_level, @created_at, @updated_at)
+         ON CONFLICT(client_order_id) DO UPDATE SET status = 'NEW', updated_at = @updated_at`
+      )
+      .run({
+        id: randomUUID(),
+        bot_id: this.botId,
+        client_order_id: level.clientOrderId,
+        exchange_order_id: level.orderId ?? null,
+        symbol: this.config.symbol,
+        side: level.side,
+        price,
+        quantity,
+        grid_level: level.level,
+        created_at: now,
+        updated_at: now
+      });
+  }
+
+  private persistFill(level: GridLevelState, quantity: number, price: number): void {
+    const now = Date.now();
+    this.deps.db
+      .prepare(`UPDATE orders SET status = 'FILLED', updated_at = ? WHERE client_order_id = ?`)
+      .run(now, level.clientOrderId);
+
+    const order = this.deps.db
+      .prepare(`SELECT id FROM orders WHERE client_order_id = ?`)
+      .get(level.clientOrderId) as { id: string } | undefined;
+    if (!order) return;
+
+    this.deps.db
+      .prepare(
+        `INSERT INTO fills (id, order_id, bot_id, symbol, side, price, quantity, quote_qty, commission, commission_asset, trade_id, created_at)
+         VALUES (@id, @order_id, @bot_id, @symbol, @side, @price, @quantity, @quote_qty, 0, NULL, NULL, @created_at)`
+      )
+      .run({
+        id: randomUUID(),
+        order_id: order.id,
+        bot_id: this.botId,
+        symbol: this.config.symbol,
+        side: level.side,
+        price,
+        quantity,
+        quote_qty: price * quantity,
+        created_at: now
+      });
   }
 
   private persistState(): void {

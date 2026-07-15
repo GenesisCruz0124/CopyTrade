@@ -86,6 +86,13 @@ async function main() {
 
   await ws.connect();
 
+  // Neither paper nor live orders push fill notifications back to strategies yet,
+  // so poll for fills on a short interval — this is what actually advances a grid
+  // past its initial orders and lets DCA take-profit see its position.
+  const reconcileTimer = setInterval(() => {
+    botManager.reconcileAll().catch((err) => logger.error({ err }, "reconcileAll failed"));
+  }, 5000);
+
   let copySignals: CopySignalService | undefined;
   let discordListener: DiscordSignalListener | undefined;
   if (isCopyTradingConfigured() && futures) {
@@ -123,6 +130,7 @@ async function main() {
     logger.info("shutting down");
     ws.close();
     pricePoller?.stop();
+    clearInterval(reconcileTimer);
     discordListener?.close();
     await app.close();
     process.exit(0);

@@ -101,6 +101,10 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     reply.send({ mode: modeOf(), trades: deps.botManager.getTrades(req.params.id) });
   });
 
+  app.get<{ Params: { id: string } }>("/bots/:id/orders", async (req, reply) => {
+    reply.send({ mode: modeOf(), orders: deps.botManager.getOpenOrders(req.params.id) });
+  });
+
   app.get<{ Params: { id: string } }>("/bots/:id/pnl", async (req, reply) => {
     reply.send({ mode: modeOf(), series: deps.botManager.getPnlSeries(req.params.id) });
   });

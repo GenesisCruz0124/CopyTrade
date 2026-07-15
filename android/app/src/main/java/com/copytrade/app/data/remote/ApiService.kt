@@ -8,6 +8,7 @@ import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.EventsResponseDto
 import com.copytrade.app.data.remote.dto.OkResponseDto
+import com.copytrade.app.data.remote.dto.OrdersResponseDto
 import com.copytrade.app.data.remote.dto.PnlResponseDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import com.copytrade.app.data.remote.dto.TradesResponseDto
@@ -45,6 +46,9 @@ interface ApiService {
 
     @GET("bots/{id}/trades")
     suspend fun getTrades(@Path("id") id: String): TradesResponseDto
+
+    @GET("bots/{id}/orders")
+    suspend fun getOrders(@Path("id") id: String): OrdersResponseDto
 
     @GET("bots/{id}/pnl")
     suspend fun getPnl(@Path("id") id: String): PnlResponseDto

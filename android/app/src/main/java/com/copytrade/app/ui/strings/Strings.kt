@@ -48,6 +48,7 @@ object Strings {
     // Bot detail
     val botDetailTitle = Bi("Bot detail", "Detalye ng bot")
     val openOrders = Bi("Open orders", "Mga bukas na order")
+    val noOpenOrders = Bi("No open orders", "Walang bukas na order")
     val recentFills = Bi("Recent fills", "Kamakailang fills")
     val pnlChart = Bi("PnL", "PnL")
     val start = Bi("Start", "Simulan")
