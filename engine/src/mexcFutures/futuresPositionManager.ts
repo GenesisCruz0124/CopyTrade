@@ -28,6 +28,9 @@ export interface FuturesPositionRow {
   take_profit_price: number | null;
   stop_loss_price: number | null;
   risk_usdt: number | null;
+  taker_fee_rate: number | null;
+  open_fee_usdt: number | null;
+  close_fee_usdt: number | null;
   status: "open" | "closed";
   close_price: number | null;
   close_reason: string | null;
@@ -38,10 +41,16 @@ export interface FuturesPositionRow {
   closed_at: number | null;
 }
 
+function totalFee(row: FuturesPositionRow): number | null {
+  if (row.open_fee_usdt == null) return null;
+  return row.open_fee_usdt + (row.close_fee_usdt ?? 0);
+}
+
 export interface FuturesPositionView extends FuturesPositionRow {
   currentPrice: number | null;
   unrealizedPnlUsdt: number | null;
   unrealizedPnlPercent: number | null;
+  totalFeeUsdt: number | null;
 }
 
 /**
@@ -143,6 +152,9 @@ export class FuturesPositionManager {
     });
 
     const riskUsdt = input.stopLossPercent != null ? marginUsdt * input.leverage * (input.stopLossPercent / 100) : null;
+    // Market orders are always taker fills; capture the rate now so close() can
+    // compute its own fee later without another contractDetail round trip.
+    const openFeeUsdt = qty * price * detail.contractSize * detail.takerFeeRate;
 
     const id = randomUUID();
     const now = Date.now();
@@ -159,6 +171,9 @@ export class FuturesPositionManager {
       take_profit_price: takeProfitPrice,
       stop_loss_price: stopLossPrice,
       risk_usdt: riskUsdt,
+      taker_fee_rate: detail.takerFeeRate,
+      open_fee_usdt: openFeeUsdt,
+      close_fee_usdt: null,
       status: "open",
       close_price: null,
       close_reason: null,
@@ -173,9 +188,9 @@ export class FuturesPositionManager {
       .prepare(
         `INSERT INTO futures_positions
            (id, symbol, side, leverage, open_type, entry_price, quantity, contract_size, margin_usdt,
-            take_profit_price, stop_loss_price, risk_usdt, status, order_id, created_at, updated_at)
+            take_profit_price, stop_loss_price, risk_usdt, taker_fee_rate, open_fee_usdt, status, order_id, created_at, updated_at)
          VALUES (@id, @symbol, @side, @leverage, @open_type, @entry_price, @quantity, @contract_size, @margin_usdt,
-                 @take_profit_price, @stop_loss_price, @risk_usdt, @status, @order_id, @created_at, @updated_at)`
+                 @take_profit_price, @stop_loss_price, @risk_usdt, @taker_fee_rate, @open_fee_usdt, @status, @order_id, @created_at, @updated_at)`
       )
       .run(row);
 
@@ -204,17 +219,27 @@ export class FuturesPositionManager {
     const closePrice = ticker.fairPrice;
     const direction = row.side === "long" ? 1 : -1;
     const realizedPnlUsdt = (closePrice - row.entry_price) * row.quantity * row.contract_size * direction;
+    const takerFeeRate = row.taker_fee_rate ?? 0.0006;
+    const closeFeeUsdt = row.quantity * closePrice * row.contract_size * takerFeeRate;
     const now = Date.now();
 
     this.db
       .prepare(
         `UPDATE futures_positions
-         SET status = 'closed', close_price = ?, close_reason = ?, realized_pnl_usdt = ?, updated_at = ?, closed_at = ?
+         SET status = 'closed', close_price = ?, close_reason = ?, realized_pnl_usdt = ?, close_fee_usdt = ?, updated_at = ?, closed_at = ?
          WHERE id = ?`
       )
-      .run(closePrice, reason, realizedPnlUsdt, now, now, positionId);
+      .run(closePrice, reason, realizedPnlUsdt, closeFeeUsdt, now, now, positionId);
 
-    return { ...row, status: "closed", close_price: closePrice, close_reason: reason, realized_pnl_usdt: realizedPnlUsdt, closed_at: now };
+    return {
+      ...row,
+      status: "closed",
+      close_price: closePrice,
+      close_reason: reason,
+      realized_pnl_usdt: realizedPnlUsdt,
+      close_fee_usdt: closeFeeUsdt,
+      closed_at: now
+    };
   }
 
   async listOpen(): Promise<FuturesPositionView[]> {
@@ -224,10 +249,17 @@ export class FuturesPositionManager {
     return this.attachLivePnl(rows);
   }
 
-  listClosed(limit = 100): FuturesPositionRow[] {
-    return this.db
+  listClosed(limit = 100): FuturesPositionView[] {
+    const rows = this.db
       .prepare(`SELECT * FROM futures_positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT ?`)
       .all(limit) as FuturesPositionRow[];
+    return rows.map((row) => ({
+      ...row,
+      currentPrice: null,
+      unrealizedPnlUsdt: null,
+      unrealizedPnlPercent: null,
+      totalFeeUsdt: totalFee(row)
+    }));
   }
 
   private async attachLivePnl(rows: FuturesPositionRow[]): Promise<FuturesPositionView[]> {
@@ -241,11 +273,12 @@ export class FuturesPositionManager {
           ...row,
           currentPrice: ticker.fairPrice,
           unrealizedPnlUsdt,
-          unrealizedPnlPercent: (unrealizedPnlUsdt / row.margin_usdt) * 100
+          unrealizedPnlPercent: (unrealizedPnlUsdt / row.margin_usdt) * 100,
+          totalFeeUsdt: totalFee(row)
         });
       } catch (err) {
         logger.warn({ err, symbol: row.symbol }, "failed to fetch ticker for open position PnL");
-        views.push({ ...row, currentPrice: null, unrealizedPnlUsdt: null, unrealizedPnlPercent: null });
+        views.push({ ...row, currentPrice: null, unrealizedPnlUsdt: null, unrealizedPnlPercent: null, totalFeeUsdt: totalFee(row) });
       }
     }
     return views;

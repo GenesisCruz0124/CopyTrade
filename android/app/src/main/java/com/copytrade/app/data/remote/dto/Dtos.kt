@@ -235,7 +235,8 @@ data class FuturesPositionDto(
     @kotlinx.serialization.SerialName("closed_at") val closedAt: Long? = null,
     val currentPrice: Double? = null,
     val unrealizedPnlUsdt: Double? = null,
-    val unrealizedPnlPercent: Double? = null
+    val unrealizedPnlPercent: Double? = null,
+    val totalFeeUsdt: Double? = null
 )
 
 @Serializable

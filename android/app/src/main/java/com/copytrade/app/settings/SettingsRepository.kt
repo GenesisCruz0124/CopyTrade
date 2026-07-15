@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -28,6 +29,7 @@ class SettingsRepository(private val context: Context) {
     private val futuresLeverageKey = stringPreferencesKey("futures_leverage")
     private val futuresSideKey = stringPreferencesKey("futures_side")
     private val futuresSymbolKey = stringPreferencesKey("futures_symbol")
+    private val futuresFavoriteSymbolsKey = stringSetPreferencesKey("futures_favorite_symbols")
 
     private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
@@ -60,6 +62,7 @@ class SettingsRepository(private val context: Context) {
     val futuresLeverage: Flow<String> = context.dataStore.data.map { it[futuresLeverageKey] ?: "5" }
     val futuresSide: Flow<String> = context.dataStore.data.map { it[futuresSideKey] ?: "long" }
     val futuresSymbol: Flow<String> = context.dataStore.data.map { it[futuresSymbolKey] ?: "" }
+    val futuresFavoriteSymbols: Flow<Set<String>> = context.dataStore.data.map { it[futuresFavoriteSymbolsKey] ?: emptySet() }
 
     suspend fun setServerUrl(url: String) {
         context.dataStore.edit { it[serverUrlKey] = url }
@@ -87,6 +90,13 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setFuturesSymbol(symbol: String) {
         context.dataStore.edit { it[futuresSymbolKey] = symbol }
+    }
+
+    suspend fun toggleFuturesFavoriteSymbol(symbol: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[futuresFavoriteSymbolsKey] ?: emptySet()
+            prefs[futuresFavoriteSymbolsKey] = if (symbol in current) current - symbol else current + symbol
+        }
     }
 
     fun setAuthToken(token: String) {
