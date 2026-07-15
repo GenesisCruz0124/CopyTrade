@@ -16,6 +16,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -65,6 +66,18 @@ fun SettingsScreen(onBack: () -> Unit, onDisconnected: () -> Unit) {
                     onClick = { viewModel.setLanguage(AppLanguage.TAGLISH) }
                 )
                 Text(Strings.taglish.resolve())
+            }
+
+            Divider()
+
+            Text(Strings.notificationsSection.resolve(), style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(Strings.notifyNewSignals.resolve(), modifier = Modifier.weight(1f))
+                Switch(checked = state.notificationsEnabled, onCheckedChange = viewModel::setNotificationsEnabled)
             }
 
             Divider()

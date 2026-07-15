@@ -2,6 +2,7 @@ package com.copytrade.app.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -30,6 +31,8 @@ class SettingsRepository(private val context: Context) {
     private val futuresSideKey = stringPreferencesKey("futures_side")
     private val futuresSymbolKey = stringPreferencesKey("futures_symbol")
     private val futuresFavoriteSymbolsKey = stringSetPreferencesKey("futures_favorite_symbols")
+    private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
+    private val notifiedSignalIdsKey = stringSetPreferencesKey("notified_signal_ids")
 
     private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
@@ -64,6 +67,12 @@ class SettingsRepository(private val context: Context) {
     val futuresSymbol: Flow<String> = context.dataStore.data.map { it[futuresSymbolKey] ?: "" }
     val futuresFavoriteSymbols: Flow<Set<String>> = context.dataStore.data.map { it[futuresFavoriteSymbolsKey] ?: emptySet() }
 
+    /** Whether a system notification should be raised when a new Discord copy signal arrives. Defaults to on. */
+    val notificationsEnabled: Flow<Boolean> = context.dataStore.data.map { it[notificationsEnabledKey] ?: true }
+
+    /** IDs of PENDING copy signals already notified, so the watcher doesn't re-notify across polls/restarts. */
+    val notifiedSignalIds: Flow<Set<String>> = context.dataStore.data.map { it[notifiedSignalIdsKey] ?: emptySet() }
+
     suspend fun setServerUrl(url: String) {
         context.dataStore.edit { it[serverUrlKey] = url }
     }
@@ -97,6 +106,14 @@ class SettingsRepository(private val context: Context) {
             val current = prefs[futuresFavoriteSymbolsKey] ?: emptySet()
             prefs[futuresFavoriteSymbolsKey] = if (symbol in current) current - symbol else current + symbol
         }
+    }
+
+    suspend fun setNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[notificationsEnabledKey] = enabled }
+    }
+
+    suspend fun setNotifiedSignalIds(ids: Set<String>) {
+        context.dataStore.edit { it[notifiedSignalIdsKey] = ids }
     }
 
     fun setAuthToken(token: String) {
