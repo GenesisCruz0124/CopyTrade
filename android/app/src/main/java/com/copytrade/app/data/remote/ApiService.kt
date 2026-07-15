@@ -7,7 +7,12 @@ import com.copytrade.app.data.remote.dto.CopySignalsResponseDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.EventsResponseDto
+import com.copytrade.app.data.remote.dto.FuturesBalanceResponseDto
+import com.copytrade.app.data.remote.dto.FuturesPositionResponseDto
+import com.copytrade.app.data.remote.dto.FuturesPositionsResponseDto
+import com.copytrade.app.data.remote.dto.FuturesSymbolsResponseDto
 import com.copytrade.app.data.remote.dto.OkResponseDto
+import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.OrdersResponseDto
 import com.copytrade.app.data.remote.dto.PnlResponseDto
 import com.copytrade.app.data.remote.dto.PriceDto
@@ -71,4 +76,19 @@ interface ApiService {
 
     @POST("copy-signals/{id}/reject")
     suspend fun rejectCopySignal(@Path("id") id: String): CopySignalResponseDto
+
+    @GET("futures/symbols")
+    suspend fun getFuturesSymbols(): FuturesSymbolsResponseDto
+
+    @GET("futures/balance")
+    suspend fun getFuturesBalance(): FuturesBalanceResponseDto
+
+    @GET("futures/positions")
+    suspend fun getFuturesPositions(): FuturesPositionsResponseDto
+
+    @POST("futures/positions")
+    suspend fun openFuturesPosition(@Body request: OpenFuturesPositionRequest): FuturesPositionResponseDto
+
+    @POST("futures/positions/{id}/close")
+    suspend fun closeFuturesPosition(@Path("id") id: String): FuturesPositionResponseDto
 }

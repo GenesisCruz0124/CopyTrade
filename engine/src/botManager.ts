@@ -223,7 +223,17 @@ export class BotManager {
   remove(botId: string): void {
     const entry = this.requireBot(botId);
     if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
-    this.db.prepare(`DELETE FROM bots WHERE id = ?`).run(botId);
+
+    // orders/fills/pnl_snapshots/events all carry a foreign key on bot_id (foreign_keys=ON),
+    // so the bot row can't be deleted until anything referencing it is gone first.
+    const deleteBotAndChildren = this.db.transaction((id: string) => {
+      this.db.prepare(`DELETE FROM fills WHERE bot_id = ?`).run(id);
+      this.db.prepare(`DELETE FROM orders WHERE bot_id = ?`).run(id);
+      this.db.prepare(`DELETE FROM pnl_snapshots WHERE bot_id = ?`).run(id);
+      this.db.prepare(`DELETE FROM events WHERE bot_id = ?`).run(id);
+      this.db.prepare(`DELETE FROM bots WHERE id = ?`).run(id);
+    });
+    deleteBotAndChildren(botId);
     this.bots.delete(botId);
   }
 

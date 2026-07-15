@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.copytrade.app.BuildConfig
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.strings.AppLanguage
 import com.copytrade.app.ui.strings.Strings
@@ -80,6 +81,11 @@ fun SettingsScreen(onBack: () -> Unit, onDisconnected: () -> Unit) {
 
             Text(Strings.about.resolve(), style = MaterialTheme.typography.titleMedium)
             Text(Strings.aboutBody.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = "${Strings.appVersion.resolve()}: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
 
             Divider()
 

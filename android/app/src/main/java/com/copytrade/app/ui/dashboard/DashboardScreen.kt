@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CandlestickChart
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -59,7 +60,8 @@ fun DashboardScreen(
     onCreateBot: () -> Unit,
     onOpenTradeLog: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenCopySignals: () -> Unit
+    onOpenCopySignals: () -> Unit,
+    onOpenFutures: () -> Unit
 ) {
     val viewModel = appViewModel { DashboardViewModel(it) }
     val state by viewModel.uiState.collectAsState()
@@ -78,6 +80,9 @@ fun DashboardScreen(
                     }
                     IconButton(onClick = onOpenCopySignals) {
                         Icon(Icons.Filled.Notifications, contentDescription = Strings.copySignalsTitle.resolve())
+                    }
+                    IconButton(onClick = onOpenFutures) {
+                        Icon(Icons.Filled.CandlestickChart, contentDescription = Strings.futuresTitle.resolve())
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = Strings.settingsTitle.resolve())

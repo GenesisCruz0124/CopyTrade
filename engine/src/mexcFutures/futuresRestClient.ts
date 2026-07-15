@@ -111,6 +111,20 @@ export class FuturesRestClient {
     return json.data as T;
   }
 
+  /** Lists every tradable contract on MEXC futures, for symbol pickers. No auth required. */
+  async allContracts(): Promise<{ symbol: string; baseCoin: string; quoteCoin: string; maxLeverage: number }[]> {
+    const all = await this.request<any[]>("GET", "/contract/detail", {}, { signed: false, queue: this.generalQueue });
+    return all
+      .filter((raw) => raw.quoteCoin === "USDT" && raw.state === 0)
+      .map((raw) => ({
+        symbol: raw.symbol,
+        baseCoin: raw.baseCoin,
+        quoteCoin: raw.quoteCoin,
+        maxLeverage: Number(raw.maxLeverage)
+      }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }
+
   async contractDetail(symbol: string): Promise<FuturesContractDetail> {
     const all = await this.request<any[]>("GET", "/contract/detail", { symbol }, { signed: false, queue: this.generalQueue });
     const raw = Array.isArray(all) ? all[0] : all;
