@@ -15,6 +15,7 @@ import com.copytrade.app.ui.futures.FuturesHistoryScreen
 import com.copytrade.app.ui.futures.FuturesScreen
 import com.copytrade.app.ui.settings.SettingsScreen
 import com.copytrade.app.ui.setup.SetupScreen
+import com.copytrade.app.ui.signals.SignalsScreen
 import com.copytrade.app.ui.tradelog.TradeLogScreen
 
 @Composable
@@ -36,11 +37,20 @@ fun CopyTradeNavGraph(startDestination: String) {
                 onOpenTradeLog = { navController.navigate(Screen.TradeLog.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onOpenCopySignals = { navController.navigate(Screen.CopySignals.route) },
+                onOpenSignals = { navController.navigate(Screen.Signals.route) },
                 onOpenFutures = { navController.navigate(Screen.Futures.route) }
             )
         }
         composable(Screen.CopySignals.route) {
             CopySignalsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Screen.Signals.route) {
+            SignalsScreen(
+                onBack = { navController.popBackStack() },
+                // The signal's pair + side are persisted before this fires, so the
+                // Futures screen picks them up when it loads.
+                onTradeSignal = { navController.navigate(Screen.Futures.route) }
+            )
         }
         composable(Screen.Futures.route) {
             FuturesScreen(

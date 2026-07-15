@@ -121,6 +121,35 @@ object Strings {
     val signalFailed = Bi("Failed", "Nabigo")
     val signalRejected = Bi("Rejected", "Tinanggihan")
 
+    // Market signals
+    val signalsTitle = Bi("Market signals", "Market signals")
+    val signalsPairLabel = Bi("Coin pair (e.g. BTCUSDT)", "Coin pair (e.g. BTCUSDT)")
+    val signalsTimeframe = Bi("Timeframe", "Timeframe")
+    val signalsAnalyze = Bi("Analyze", "I-analyze")
+    val signalsAnalyzing = Bi("Analyzing market…", "Ina-analyze ang market…")
+    val signalsEmptyHint = Bi(
+        "Enter a coin pair and tap Analyze to get a long/short signal.",
+        "Maglagay ng coin pair at i-tap ang Analyze para sa long/short signal."
+    )
+    val signalsLong = Bi("LONG", "LONG")
+    val signalsShort = Bi("SHORT", "SHORT")
+    val signalsNeutral = Bi("NEUTRAL", "NEUTRAL")
+    val signalsNeutralHint = Bi(
+        "No clear edge right now — best to wait.",
+        "Walang malinaw na edge ngayon — mas mabuting maghintay."
+    )
+    val signalsSuggestedEntry = Bi("Suggested entry", "Suggested entry")
+    val signalsStopLoss = Bi("Stop loss", "Stop loss")
+    val signalsTakeProfit = Bi("Take profit", "Take profit")
+    val signalsRiskReward = Bi("Risk / reward", "Risk / reward")
+    val signalsWhy = Bi("Why this signal", "Bakit ganito ang signal")
+    val signalsIndicators = Bi("Indicators", "Mga indicator")
+    val signalsTradeThis = Bi("Trade this signal", "I-trade ang signal na ito")
+    val signalsDisclaimer = Bi(
+        "For information only. Not financial advice — trade at your own risk.",
+        "Para sa impormasyon lamang. Hindi financial advice — mag-trade nang may sariling pananagutan."
+    )
+
     // Futures trading
     val futuresTitle = Bi("Futures trading", "Futures trading")
     val futuresNotConfigured = Bi(

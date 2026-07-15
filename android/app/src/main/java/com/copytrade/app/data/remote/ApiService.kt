@@ -21,6 +21,7 @@ import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.OrdersResponseDto
 import com.copytrade.app.data.remote.dto.PnlResponseDto
 import com.copytrade.app.data.remote.dto.PriceDto
+import com.copytrade.app.data.remote.dto.SignalResponseDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import com.copytrade.app.data.remote.dto.TradesResponseDto
 import retrofit2.http.Body
@@ -66,6 +67,12 @@ interface ApiService {
 
     @GET("price/{symbol}")
     suspend fun getPrice(@Path("symbol") symbol: String): PriceDto
+
+    @GET("signals/{symbol}")
+    suspend fun getSignal(
+        @Path("symbol") symbol: String,
+        @Query("interval") interval: String
+    ): SignalResponseDto
 
     @GET("events")
     suspend fun getEvents(@Query("since") since: Long): EventsResponseDto
