@@ -5,23 +5,26 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -157,56 +160,65 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(Strings.tokenPair.resolve(), style = MaterialTheme.typography.titleMedium)
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-            OutlinedTextField(
-                value = state.symbolQuery,
-                onValueChange = {
-                    viewModel.setSymbolQuery(it)
-                    expanded = true
-                },
-                label = { Text(Strings.searchTokenPair.resolve()) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor()
-                    .onFocusChanged { focus ->
-                        if (focus.isFocused) {
-                            expanded = true
-                            // Tapping a field that still shows the previously picked symbol only ever
-                            // matched itself in the dropdown, making it look locked — clear it so the
-                            // full/favorites list shows and typing starts a fresh search.
-                            if (state.symbolQuery.isNotBlank() && state.symbolQuery == state.selectedSymbol) {
-                                viewModel.setSymbolQuery("")
-                            }
-                        } else if (state.symbolQuery.isBlank() && state.selectedSymbol.isNotBlank()) {
-                            // Tapped away without picking anything — restore the prior selection
-                            // instead of leaving the field empty.
-                            viewModel.setSymbolQuery(state.selectedSymbol)
+        // Deliberately not using ExposedDropdownMenuBox/ExposedDropdownMenu here — that popup-based
+        // menu flips to render above the anchor when the keyboard eats vertical space, which ends up
+        // covering the very field you're trying to edit. An inline list in the normal layout flow
+        // (below, pushing the rest of the form down) can never overlap the input.
+        OutlinedTextField(
+            value = state.symbolQuery,
+            onValueChange = {
+                viewModel.setSymbolQuery(it)
+                expanded = true
+            },
+            label = { Text(Strings.searchTokenPair.resolve()) },
+            trailingIcon = {
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focus ->
+                    if (focus.isFocused) {
+                        expanded = true
+                        // Tapping a field that still shows the previously picked symbol only ever
+                        // matched itself in the list, making it look locked — clear it so the
+                        // full/favorites list shows and typing starts a fresh search.
+                        if (state.symbolQuery.isNotBlank() && state.symbolQuery == state.selectedSymbol) {
+                            viewModel.setSymbolQuery("")
                         }
+                    } else if (state.symbolQuery.isBlank() && state.selectedSymbol.isNotBlank()) {
+                        // Tapped away without picking anything — restore the prior selection
+                        // instead of leaving the field empty.
+                        viewModel.setSymbolQuery(state.selectedSymbol)
                     }
-            )
-            ExposedDropdownMenu(
-                expanded = expanded && filteredSymbols.isNotEmpty(),
-                onDismissRequest = { expanded = false }
+                }
+        )
+        if (expanded && filteredSymbols.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
-                filteredSymbols.forEach { symbol ->
-                    val isFavorite = symbol.symbol in state.favorites
-                    DropdownMenuItem(
-                        text = { Text("${symbol.symbol} (max ${symbol.maxLeverage.toInt()}x)") },
-                        leadingIcon = {
-                            IconButton(onClick = { viewModel.toggleFavorite(symbol.symbol) }) {
-                                Icon(
-                                    if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                    contentDescription = null,
-                                    tint = if (isFavorite) PaperOrange else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                LazyColumn {
+                    items(filteredSymbols, key = { it.symbol }) { symbol ->
+                        val isFavorite = symbol.symbol in state.favorites
+                        DropdownMenuItem(
+                            text = { Text("${symbol.symbol} (max ${symbol.maxLeverage.toInt()}x)") },
+                            leadingIcon = {
+                                IconButton(onClick = { viewModel.toggleFavorite(symbol.symbol) }) {
+                                    Icon(
+                                        if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                        contentDescription = null,
+                                        tint = if (isFavorite) PaperOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            onClick = {
+                                viewModel.selectSymbol(symbol.symbol)
+                                expanded = false
                             }
-                        },
-                        onClick = {
-                            viewModel.selectSymbol(symbol.symbol)
-                            expanded = false
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
