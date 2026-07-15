@@ -10,6 +10,7 @@ import com.copytrade.app.data.remote.dto.EventsResponseDto
 import com.copytrade.app.data.remote.dto.OkResponseDto
 import com.copytrade.app.data.remote.dto.OrdersResponseDto
 import com.copytrade.app.data.remote.dto.PnlResponseDto
+import com.copytrade.app.data.remote.dto.PriceDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import com.copytrade.app.data.remote.dto.TradesResponseDto
 import retrofit2.http.Body
@@ -52,6 +53,9 @@ interface ApiService {
 
     @GET("bots/{id}/pnl")
     suspend fun getPnl(@Path("id") id: String): PnlResponseDto
+
+    @GET("price/{symbol}")
+    suspend fun getPrice(@Path("symbol") symbol: String): PriceDto
 
     @GET("events")
     suspend fun getEvents(@Query("since") since: Long): EventsResponseDto

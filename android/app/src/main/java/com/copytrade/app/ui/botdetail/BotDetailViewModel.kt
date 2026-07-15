@@ -20,6 +20,7 @@ data class BotDetailUiState(
     val fills: List<FillEntity> = emptyList(),
     val pnlSeries: List<PnlSnapshotEntity> = emptyList(),
     val openOrders: List<OrderDto> = emptyList(),
+    val currentPrice: Double? = null,
     val error: String? = null
 )
 
@@ -50,7 +51,9 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
                 repo.refreshTrades(botId)
                 repo.refreshPnl(botId)
                 val orders = repo.getOpenOrders(botId)
-                _uiState.value = _uiState.value.copy(openOrders = orders)
+                val symbol = _uiState.value.bot?.symbol
+                val price = symbol?.let { runCatching { repo.getPrice(it) }.getOrNull() }
+                _uiState.value = _uiState.value.copy(openOrders = orders, currentPrice = price ?: _uiState.value.currentPrice)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message)
             }

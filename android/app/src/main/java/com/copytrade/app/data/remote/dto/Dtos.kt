@@ -13,6 +13,13 @@ data class BalanceDto(
 )
 
 @Serializable
+data class PriceDto(
+    val mode: String,
+    val symbol: String,
+    val price: Double
+)
+
+@Serializable
 data class StatusDto(
     val mode: String,
     val uptimeSeconds: Long,

@@ -144,6 +144,15 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     reply.send({ mode: modeOf(), series: deps.botManager.getPnlSeries(req.params.id) });
   });
 
+  app.get<{ Params: { symbol: string } }>("/price/:symbol", async (req, reply) => {
+    try {
+      const ticker = await deps.exchange.getTickerPrice(req.params.symbol);
+      reply.send({ mode: modeOf(), symbol: ticker.symbol, price: ticker.price });
+    } catch (err) {
+      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
   app.get<{ Querystring: { since?: string } }>("/events", async (req, reply) => {
     const since = req.query.since ? Number(req.query.since) : 0;
     const events = deps.db
