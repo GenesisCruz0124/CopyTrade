@@ -1,5 +1,7 @@
 package com.copytrade.app.data.remote.dto
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -106,8 +108,9 @@ data class OkResponseDto(
 )
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class CreateGridBotRequest(
-    val type: String = "grid",
+    @EncodeDefault val type: String = "grid",
     val symbol: String,
     val lowerPrice: Double,
     val upperPrice: Double,
@@ -150,8 +153,9 @@ data class CopySignalResponseDto(
 )
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class CreateDcaBotRequest(
-    val type: String = "dca",
+    @EncodeDefault val type: String = "dca",
     val symbol: String,
     val amountUsdt: Double,
     val interval: String,
@@ -159,7 +163,7 @@ data class CreateDcaBotRequest(
     val dipMultiplier: Double? = null,
     val dipThresholdPct: Double? = null,
     val takeProfitPct: Double? = null,
-    val orderStyle: String = "market",
+    @EncodeDefault val orderStyle: String = "market",
     val dailyLossLimitUsdt: Double? = null,
     val confirmLive: Boolean = false
 )
