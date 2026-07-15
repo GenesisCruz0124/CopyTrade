@@ -13,6 +13,7 @@ import com.copytrade.app.data.remote.dto.FuturesPositionsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPriceDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
+import com.copytrade.app.data.remote.dto.KlinesResponseDto
 import com.copytrade.app.data.remote.dto.OkResponseDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.OrdersResponseDto
@@ -102,4 +103,17 @@ interface ApiService {
 
     @GET("futures/pnl/today")
     suspend fun getFuturesTodayPnl(): FuturesTodayPnlDto
+
+    @GET("klines/{symbol}")
+    suspend fun getKlines(
+        @Path("symbol") symbol: String,
+        @Query("interval") interval: String = "15m",
+        @Query("limit") limit: Int = 100
+    ): KlinesResponseDto
+
+    @GET("futures/klines/{symbol}")
+    suspend fun getFuturesKlines(
+        @Path("symbol") symbol: String,
+        @Query("limit") limit: Int = 100
+    ): KlinesResponseDto
 }

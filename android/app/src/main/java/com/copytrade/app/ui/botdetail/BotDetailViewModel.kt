@@ -6,6 +6,7 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.BotEntity
 import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.local.entity.PnlSnapshotEntity
+import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OrderDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ data class BotDetailUiState(
     val pnlSeries: List<PnlSnapshotEntity> = emptyList(),
     val openOrders: List<OrderDto> = emptyList(),
     val currentPrice: Double? = null,
+    val klines: List<KlineDto> = emptyList(),
     val error: String? = null
 )
 
@@ -53,7 +55,12 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
                 val orders = repo.getOpenOrders(botId)
                 val symbol = _uiState.value.bot?.symbol
                 val price = symbol?.let { runCatching { repo.getPrice(it) }.getOrNull() }
-                _uiState.value = _uiState.value.copy(openOrders = orders, currentPrice = price ?: _uiState.value.currentPrice)
+                val klines = symbol?.let { runCatching { repo.getKlines(it) }.getOrNull() }
+                _uiState.value = _uiState.value.copy(
+                    openOrders = orders,
+                    currentPrice = price ?: _uiState.value.currentPrice,
+                    klines = klines ?: _uiState.value.klines
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message)
             }

@@ -173,6 +173,20 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     }
   });
 
+  app.get<{ Params: { symbol: string }; Querystring: { interval?: string; limit?: string } }>(
+    "/klines/:symbol",
+    async (req, reply) => {
+      try {
+        const interval = req.query.interval ?? "15m";
+        const limit = req.query.limit ? Number(req.query.limit) : 100;
+        const klines = await deps.exchange.getKlines(req.params.symbol, interval, limit);
+        reply.send({ mode: modeOf(), symbol: req.params.symbol, klines });
+      } catch (err) {
+        reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      }
+    }
+  );
+
   app.get<{ Querystring: { since?: string } }>("/events", async (req, reply) => {
     const since = req.query.since ? Number(req.query.since) : 0;
     const events = deps.db
@@ -219,6 +233,23 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
       reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
+
+  app.get<{ Params: { symbol: string }; Querystring: { limit?: string } }>(
+    "/futures/klines/:symbol",
+    async (req, reply) => {
+      if (!deps.futures) {
+        reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+        return;
+      }
+      try {
+        const limit = req.query.limit ? Number(req.query.limit) : 100;
+        const klines = await deps.futures.futuresClient.klines(req.params.symbol, "Min15", limit);
+        reply.send({ mode: modeOf(), symbol: req.params.symbol, klines });
+      } catch (err) {
+        reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      }
+    }
+  );
 
   app.get("/futures/positions", async (_req, reply) => {
     if (!deps.futuresPositions) {

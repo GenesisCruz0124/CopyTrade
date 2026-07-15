@@ -4,6 +4,7 @@ import { logger } from "../logger.js";
 import type {
   FuturesAsset,
   FuturesContractDetail,
+  FuturesKline,
   FuturesOrderResult,
   FuturesPlaceOrderParams,
   FuturesPosition,
@@ -148,6 +149,33 @@ export class FuturesRestClient {
   async ticker(symbol: string): Promise<FuturesTicker> {
     const raw = await this.request<any>("GET", "/contract/ticker", { symbol }, { signed: false, queue: this.generalQueue });
     return { symbol: raw.symbol, lastPrice: Number(raw.lastPrice), fairPrice: Number(raw.fairPrice ?? raw.lastPrice) };
+  }
+
+  /** Futures kline candles. MEXC returns parallel arrays (not array-of-arrays like spot),
+   *  time in seconds, and no `limit` param — truncate to the most recent `limit` client-side. */
+  async klines(symbol: string, interval: string, limit = 100): Promise<FuturesKline[]> {
+    const raw = await this.request<{
+      time: number[];
+      open: number[];
+      close: number[];
+      high: number[];
+      low: number[];
+      vol: number[];
+    }>("GET", `/contract/kline/${symbol}`, { interval }, { signed: false, queue: this.generalQueue });
+    const n = raw.time?.length ?? 0;
+    const start = Math.max(0, n - limit);
+    const out: FuturesKline[] = [];
+    for (let i = start; i < n; i++) {
+      out.push({
+        openTime: raw.time[i] * 1000,
+        open: Number(raw.open[i]),
+        high: Number(raw.high[i]),
+        low: Number(raw.low[i]),
+        close: Number(raw.close[i]),
+        volume: Number(raw.vol[i])
+      });
+    }
+    return out;
   }
 
   async placeOrder(params: FuturesPlaceOrderParams): Promise<FuturesOrderResult> {

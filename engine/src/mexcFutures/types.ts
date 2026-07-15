@@ -24,6 +24,15 @@ export interface FuturesTicker {
   fairPrice: number; // mark price, used for liquidation math
 }
 
+export interface FuturesKline {
+  openTime: number; // ms epoch
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface FuturesPlaceOrderParams {
   symbol: string;
   side: FuturesOrderSide;

@@ -16,6 +16,7 @@ import com.copytrade.app.data.remote.dto.FuturesBalanceDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
+import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.StatusDto
 import kotlinx.coroutines.flow.Flow
@@ -124,6 +125,10 @@ class EngineRepository(
     suspend fun getFuturesPrice(symbol: String): Double = api.getFuturesPrice(symbol).price
 
     suspend fun getFuturesTodayPnl(): FuturesTodayPnlDto = api.getFuturesTodayPnl()
+
+    suspend fun getKlines(symbol: String): List<KlineDto> = api.getKlines(symbol).klines
+
+    suspend fun getFuturesKlines(symbol: String): List<KlineDto> = api.getFuturesKlines(symbol).klines
 
     private fun com.copytrade.app.data.remote.dto.BotDto.toEntity() = BotEntity(
         id = id,

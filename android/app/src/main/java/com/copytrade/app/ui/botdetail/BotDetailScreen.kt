@@ -37,6 +37,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.remote.dto.OrderDto
+import com.copytrade.app.ui.components.CandlestickChart
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -87,6 +88,7 @@ fun BotDetailScreen(botId: String, onBack: () -> Unit) {
             item { ConfigSummaryCard(state) }
             item { ControlsRow(viewModel) }
             item { PnlChartCard(state) }
+            item { KlineChartCard(state) }
             item {
                 Text(
                     text = "${Strings.openOrders.resolve()} (${state.openOrders.size})",
@@ -164,6 +166,17 @@ private fun PnlChartCard(state: BotDetailUiState) {
                     .fillMaxWidth()
                     .height(180.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun KlineChartCard(state: BotDetailUiState) {
+    if (state.klines.isEmpty()) return
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(Strings.priceChart.resolve(), style = MaterialTheme.typography.titleMedium)
+            CandlestickChart(state.klines, modifier = Modifier.fillMaxWidth())
         }
     }
 }
