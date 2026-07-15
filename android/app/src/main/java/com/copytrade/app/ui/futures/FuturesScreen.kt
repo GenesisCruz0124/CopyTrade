@@ -300,13 +300,37 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
             )
         }
 
-        OutlinedTextField(
-            value = state.takeProfitPercent,
-            onValueChange = viewModel::setTakeProfitPercent,
-            label = { Text(Strings.takeProfitPercentLabel.resolve()) },
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth()
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = state.takeProfitInputMode == TpInputMode.PERCENT,
+                onClick = { viewModel.setTakeProfitInputMode(TpInputMode.PERCENT) },
+                shape = SegmentedButtonDefaults.itemShape(0, 2)
+            ) { Text(Strings.takeProfitByPercent.resolve()) }
+            SegmentedButton(
+                selected = state.takeProfitInputMode == TpInputMode.PRICE,
+                onClick = { viewModel.setTakeProfitInputMode(TpInputMode.PRICE) },
+                shape = SegmentedButtonDefaults.itemShape(1, 2)
+            ) { Text(Strings.takeProfitByPrice.resolve()) }
+        }
+        if (state.takeProfitInputMode == TpInputMode.PERCENT) {
+            OutlinedTextField(
+                value = state.takeProfitPercent,
+                onValueChange = viewModel::setTakeProfitPercent,
+                label = { Text(Strings.takeProfitPercentLabel.resolve()) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            OutlinedTextField(
+                value = state.takeProfitPriceUsd,
+                onValueChange = viewModel::setTakeProfitPriceUsd,
+                label = { Text(Strings.takeProfitPriceLabel.resolve()) },
+                isError = state.takeProfitPriceError != null,
+                supportingText = state.takeProfitPriceError?.let { { Text(it, color = LossRed) } },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             SegmentedButton(
                 selected = state.stopLossInputMode == SlInputMode.PERCENT,
