@@ -157,6 +157,11 @@ object Strings {
     val closeReasonManual = Bi("Manual", "Manual")
     val closeReasonTakeProfit = Bi("Take-profit hit", "Naabot ang take-profit")
     val closeReasonStopLoss = Bi("Stop-loss hit", "Naabot ang stop-loss")
+    val riskUsdAmountLabel = Bi("Risk amount (USD)", "Risk na halaga (USD)")
+    val riskUsdAmountHint = Bi(
+        "Optional — how much you're willing to lose; auto-fills stop-loss %",
+        "Optional — magkano ang gusto mong ma-risk; awtomatikong pupunuin ang stop-loss %"
+    )
 }
 
 @Composable

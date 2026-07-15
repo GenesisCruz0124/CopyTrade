@@ -27,6 +27,7 @@ class SettingsRepository(private val context: Context) {
     private val futuresSizingModeKey = stringPreferencesKey("futures_sizing_mode")
     private val futuresLeverageKey = stringPreferencesKey("futures_leverage")
     private val futuresSideKey = stringPreferencesKey("futures_side")
+    private val futuresSymbolKey = stringPreferencesKey("futures_symbol")
 
     private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
@@ -58,6 +59,7 @@ class SettingsRepository(private val context: Context) {
     val futuresSizingMode: Flow<String> = context.dataStore.data.map { it[futuresSizingModeKey] ?: "usd" }
     val futuresLeverage: Flow<String> = context.dataStore.data.map { it[futuresLeverageKey] ?: "5" }
     val futuresSide: Flow<String> = context.dataStore.data.map { it[futuresSideKey] ?: "long" }
+    val futuresSymbol: Flow<String> = context.dataStore.data.map { it[futuresSymbolKey] ?: "" }
 
     suspend fun setServerUrl(url: String) {
         context.dataStore.edit { it[serverUrlKey] = url }
@@ -81,6 +83,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setFuturesSide(side: String) {
         context.dataStore.edit { it[futuresSideKey] = side }
+    }
+
+    suspend fun setFuturesSymbol(symbol: String) {
+        context.dataStore.edit { it[futuresSymbolKey] = symbol }
     }
 
     fun setAuthToken(token: String) {

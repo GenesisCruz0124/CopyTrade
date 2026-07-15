@@ -155,6 +155,13 @@ private fun ClosedPositionCard(position: FuturesPositionDto) {
                     fontWeight = FontWeight.Bold
                 )
             }
+            position.riskUsdt?.let {
+                Text(
+                    "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

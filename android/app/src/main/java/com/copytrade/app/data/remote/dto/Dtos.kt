@@ -226,6 +226,7 @@ data class FuturesPositionDto(
     @kotlinx.serialization.SerialName("margin_usdt") val marginUsdt: Double,
     @kotlinx.serialization.SerialName("take_profit_price") val takeProfitPrice: Double? = null,
     @kotlinx.serialization.SerialName("stop_loss_price") val stopLossPrice: Double? = null,
+    @kotlinx.serialization.SerialName("risk_usdt") val riskUsdt: Double? = null,
     val status: String,
     @kotlinx.serialization.SerialName("close_price") val closePrice: Double? = null,
     @kotlinx.serialization.SerialName("close_reason") val closeReason: String? = null,

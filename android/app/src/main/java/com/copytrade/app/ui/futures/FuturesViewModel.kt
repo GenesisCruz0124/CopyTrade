@@ -19,6 +19,11 @@ enum class SizingMode { USD, PERCENT }
 private fun SizingMode.toPrefValue() = if (this == SizingMode.USD) "usd" else "percent"
 private fun String.toSizingMode() = if (this == "percent") SizingMode.PERCENT else SizingMode.USD
 
+private fun formatPercent(v: Double): String {
+    val rounded = String.format(java.util.Locale.US, "%.4f", v).trimEnd('0').trimEnd('.')
+    return rounded.ifEmpty { "0" }
+}
+
 data class FuturesUiState(
     val mode: String = "paper",
     val symbols: List<FuturesSymbolDto> = emptyList(),
@@ -33,6 +38,7 @@ data class FuturesUiState(
     val percentOfBalance: String = "",
     val takeProfitPercent: String = "",
     val stopLossPercent: String = "",
+    val riskUsdAmount: String = "",
     val balance: FuturesBalanceDto? = null,
     val positions: List<FuturesPositionDto> = emptyList(),
     val isSubmitting: Boolean = false,
@@ -41,7 +47,18 @@ data class FuturesUiState(
     val error: String? = null,
     val notConfigured: Boolean = false,
     val opened: Boolean = false
-)
+) {
+    /** Margin (USDT) implied by the current sizing inputs, or null if it can't be computed yet. */
+    val impliedMarginUsdt: Double?
+        get() = when (sizingMode) {
+            SizingMode.USD -> amountUsd.toDoubleOrNull()
+            SizingMode.PERCENT -> {
+                val pct = percentOfBalance.toDoubleOrNull()
+                val bal = balance?.availableBalance
+                if (pct != null && bal != null) pct / 100 * bal else null
+            }
+        }
+}
 
 class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     private val _uiState = MutableStateFlow(FuturesUiState())
@@ -56,12 +73,16 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     private fun loadPersistedSelections() {
         viewModelScope.launch {
             val settings = app.settingsRepository
+            val symbol = settings.futuresSymbol.first()
             _uiState.value = _uiState.value.copy(
                 openType = settings.futuresOpenType.first(),
                 sizingMode = settings.futuresSizingMode.first().toSizingMode(),
                 leverage = settings.futuresLeverage.first(),
-                side = settings.futuresSide.first()
+                side = settings.futuresSide.first(),
+                selectedSymbol = symbol,
+                symbolQuery = symbol
             )
+            if (symbol.isNotBlank()) refreshPrice()
         }
     }
 
@@ -128,17 +149,20 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
 
     fun selectSymbol(symbol: String) {
         _uiState.value = _uiState.value.copy(selectedSymbol = symbol, symbolQuery = symbol, currentPrice = null)
+        viewModelScope.launch { app.settingsRepository.setFuturesSymbol(symbol) }
         refreshPrice()
     }
 
     fun setSide(side: String) {
         _uiState.value = _uiState.value.copy(side = side)
         viewModelScope.launch { app.settingsRepository.setFuturesSide(side) }
+        recomputeStopLossFromRisk()
     }
 
     fun setLeverage(v: String) {
         _uiState.value = _uiState.value.copy(leverage = v)
         viewModelScope.launch { app.settingsRepository.setFuturesLeverage(v) }
+        recomputeStopLossFromRisk()
     }
 
     fun setOpenType(v: String) {
@@ -149,14 +173,17 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     fun setSizingMode(mode: SizingMode) {
         _uiState.value = _uiState.value.copy(sizingMode = mode)
         viewModelScope.launch { app.settingsRepository.setFuturesSizingMode(mode.toPrefValue()) }
+        recomputeStopLossFromRisk()
     }
 
     fun setAmountUsd(v: String) {
         _uiState.value = _uiState.value.copy(amountUsd = v)
+        recomputeStopLossFromRisk()
     }
 
     fun setPercentOfBalance(v: String) {
         _uiState.value = _uiState.value.copy(percentOfBalance = v)
+        recomputeStopLossFromRisk()
     }
 
     fun setTakeProfitPercent(v: String) {
@@ -164,7 +191,24 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     }
 
     fun setStopLossPercent(v: String) {
-        _uiState.value = _uiState.value.copy(stopLossPercent = v)
+        // A direct edit detaches from the risk-amount auto-fill until the risk amount is touched again.
+        _uiState.value = _uiState.value.copy(stopLossPercent = v, riskUsdAmount = "")
+    }
+
+    /** Alternative stop-loss input: "I'm willing to lose $X" auto-fills the Stop-loss (%) field. */
+    fun setRiskUsdAmount(v: String) {
+        _uiState.value = _uiState.value.copy(riskUsdAmount = v)
+        recomputeStopLossFromRisk()
+    }
+
+    private fun recomputeStopLossFromRisk() {
+        val state = _uiState.value
+        val riskUsd = state.riskUsdAmount.toDoubleOrNull() ?: return
+        val margin = state.impliedMarginUsdt ?: return
+        val leverage = state.leverage.toDoubleOrNull() ?: return
+        if (riskUsd <= 0 || margin <= 0 || leverage <= 0) return
+        val percent = riskUsd / (margin * leverage) * 100
+        _uiState.value = _uiState.value.copy(stopLossPercent = formatPercent(percent))
     }
 
     fun setConfirmLive(v: Boolean) {
@@ -193,6 +237,44 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
             return
         }
 
+        // Validate TP/SL against the live price before ever hitting the network — a stale or
+        // absent price, or a percentage that would flip TP/SL to the wrong side, must block
+        // submission instead of letting the engine reject it after the fact.
+        val currentPrice = state.currentPrice
+        if (currentPrice == null) {
+            _uiState.value = state.copy(error = "Still loading the current price — try again in a moment")
+            return
+        }
+        val tpPercent = state.takeProfitPercent.toDoubleOrNull()
+        val slPercent = state.stopLossPercent.toDoubleOrNull()
+        if (state.takeProfitPercent.isNotBlank() && (tpPercent == null || tpPercent <= 0)) {
+            _uiState.value = state.copy(error = "Take-profit must be a positive percentage")
+            return
+        }
+        if (state.stopLossPercent.isNotBlank() && (slPercent == null || slPercent <= 0 || slPercent >= 100)) {
+            _uiState.value = state.copy(error = "Stop-loss must be a positive percentage below 100")
+            return
+        }
+        val tpPrice = tpPercent?.let { if (state.side == "long") currentPrice * (1 + it / 100) else currentPrice * (1 - it / 100) }
+        val slPrice = slPercent?.let { if (state.side == "long") currentPrice * (1 - it / 100) else currentPrice * (1 + it / 100) }
+        if (tpPrice != null && tpPrice <= 0) {
+            _uiState.value = state.copy(error = "Take-profit is invalid at the current price")
+            return
+        }
+        if (slPrice != null && slPrice <= 0) {
+            _uiState.value = state.copy(error = "Stop-loss is invalid at the current price")
+            return
+        }
+        val tpSlValid = when {
+            tpPrice == null && slPrice == null -> true
+            state.side == "long" -> (slPrice == null || slPrice < currentPrice) && (tpPrice == null || tpPrice > currentPrice)
+            else -> (slPrice == null || slPrice > currentPrice) && (tpPrice == null || tpPrice < currentPrice)
+        }
+        if (!tpSlValid) {
+            _uiState.value = state.copy(error = "Take-profit / stop-loss must be on the correct side of the current price")
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSubmitting = true, error = null, opened = false)
             try {
@@ -204,8 +286,8 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                     openType = state.openType,
                     amountUsd = if (state.sizingMode == SizingMode.USD) amountUsd else null,
                     percentOfBalance = if (state.sizingMode == SizingMode.PERCENT) percent else null,
-                    takeProfitPercent = state.takeProfitPercent.toDoubleOrNull(),
-                    stopLossPercent = state.stopLossPercent.toDoubleOrNull(),
+                    takeProfitPercent = tpPercent,
+                    stopLossPercent = slPercent,
                     confirmLive = state.confirmLive
                 )
                 app.repositoryFor(url).openFuturesPosition(request)
