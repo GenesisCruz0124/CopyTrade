@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 data class DashboardUiState(
     val mode: String = "paper",
     val balances: List<BalanceDto> = emptyList(),
+    val totalValueUsdt: Double? = null,
+    val totalValuePhp: Double? = null,
     val bots: List<BotEntity> = emptyList(),
     val isRefreshing: Boolean = false,
     val killSwitchEngaged: Boolean = false,
@@ -49,6 +51,8 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     mode = status.mode,
                     balances = status.balances,
+                    totalValueUsdt = status.totalValueUsdt,
+                    totalValuePhp = status.totalValuePhp,
                     killSwitchEngaged = status.killSwitchEngaged,
                     isRefreshing = false
                 )

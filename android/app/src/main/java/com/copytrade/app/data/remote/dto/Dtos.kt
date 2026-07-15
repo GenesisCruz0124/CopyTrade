@@ -17,6 +17,9 @@ data class StatusDto(
     val mode: String,
     val uptimeSeconds: Long,
     val balances: List<BalanceDto> = emptyList(),
+    val totalValueUsdt: Double? = null,
+    val usdToPhpRate: Double? = null,
+    val totalValuePhp: Double? = null,
     val killSwitchEngaged: Boolean = false
 )
 

@@ -8,6 +8,7 @@ import type { SafetyRails } from "../safety/safetyRails.js";
 import type { ExchangeClient } from "../exchange/ExchangeClient.js";
 import { botConfigSchema } from "../config/botConfigSchema.js";
 import type { CopySignalService } from "../copySignals/copySignalService.js";
+import type { FxRateService } from "../fx/fxRateService.js";
 
 export interface ApiServerDeps {
   db: Database.Database;
@@ -16,6 +17,35 @@ export interface ApiServerDeps {
   botManager: BotManager;
   startedAt: number;
   copySignals?: CopySignalService;
+  fxRates?: FxRateService;
+}
+
+/**
+ * Balances come back in native units per asset (BTC, ETH, USDT, ...) — summing
+ * them directly is meaningless. Values each non-USDT asset at its current
+ * USDT ticker price; assets with no direct USDT pair are excluded from the
+ * total rather than guessed at.
+ */
+async function computeTotalValueUsdt(
+  exchange: ExchangeClient,
+  balances: { asset: string; free: number; locked: number }[]
+): Promise<number> {
+  let total = 0;
+  for (const balance of balances) {
+    const amount = balance.free + balance.locked;
+    if (amount === 0) continue;
+    if (balance.asset === "USDT" || balance.asset === "USD") {
+      total += amount;
+      continue;
+    }
+    try {
+      const ticker = await exchange.getTickerPrice(`${balance.asset}USDT`);
+      total += amount * ticker.price;
+    } catch {
+      // no direct USDT pair known for this asset — leave it out rather than guess
+    }
+  }
+  return total;
 }
 
 function modeOf(): "paper" | "live" {
@@ -35,10 +65,15 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
 
   app.get("/status", async (_req, reply) => {
     const account = await deps.exchange.getAccountInfo().catch(() => ({ balances: [] }));
+    const totalValueUsdt = await computeTotalValueUsdt(deps.exchange, account.balances).catch(() => null);
+    const phpRate = deps.fxRates?.getUsdToPhpRate() ?? null;
     reply.send({
       mode: modeOf(),
       uptimeSeconds: Math.floor((Date.now() - deps.startedAt) / 1000),
       balances: account.balances,
+      totalValueUsdt,
+      usdToPhpRate: phpRate,
+      totalValuePhp: totalValueUsdt !== null && phpRate !== null ? totalValueUsdt * phpRate : null,
       killSwitchEngaged: deps.safety.isKillSwitchEngaged()
     });
   });
