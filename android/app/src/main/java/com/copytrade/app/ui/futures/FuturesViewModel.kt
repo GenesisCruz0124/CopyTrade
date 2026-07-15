@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 
 enum class SizingMode { USD, PERCENT }
 enum class SlInputMode { PERCENT, PRICE }
+enum class TpInputMode { PERCENT, PRICE }
 
 private fun SizingMode.toPrefValue() = if (this == SizingMode.USD) "usd" else "percent"
 private fun String.toSizingMode() = if (this == "percent") SizingMode.PERCENT else SizingMode.USD
@@ -42,7 +43,10 @@ data class FuturesUiState(
     val sizingMode: SizingMode = SizingMode.USD,
     val amountUsd: String = "",
     val percentOfBalance: String = "",
+    val takeProfitInputMode: TpInputMode = TpInputMode.PERCENT,
     val takeProfitPercent: String = "",
+    val takeProfitPriceUsd: String = "",
+    val takeProfitPriceError: String? = null,
     val stopLossInputMode: SlInputMode = SlInputMode.PERCENT,
     val stopLossPercent: String = "",
     val stopLossPriceUsd: String = "",
@@ -134,6 +138,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                     error = positionsResult.exceptionOrNull()?.toUserMessage()
                 )
                 recomputeStopLoss()
+                recomputeTakeProfit()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
@@ -152,6 +157,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 if (_uiState.value.selectedSymbol == symbol) {
                     _uiState.value = _uiState.value.copy(currentPrice = price)
                     recomputeStopLoss()
+                    recomputeTakeProfit()
                 }
             } catch (_: Exception) {
                 // Best-effort — the price ticker isn't critical enough to surface as an error.
@@ -196,6 +202,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         _uiState.value = _uiState.value.copy(side = side)
         viewModelScope.launch { app.settingsRepository.setFuturesSide(side) }
         recomputeStopLoss()
+        recomputeTakeProfit()
     }
 
     fun setLeverage(v: String) {
@@ -225,8 +232,43 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         recomputeStopLoss()
     }
 
+    fun setTakeProfitInputMode(mode: TpInputMode) {
+        _uiState.value = _uiState.value.copy(takeProfitInputMode = mode, takeProfitPriceError = null)
+        recomputeTakeProfit()
+    }
+
     fun setTakeProfitPercent(v: String) {
         _uiState.value = _uiState.value.copy(takeProfitPercent = v)
+    }
+
+    fun setTakeProfitPriceUsd(v: String) {
+        _uiState.value = _uiState.value.copy(takeProfitPriceUsd = v)
+        recomputeTakeProfit()
+    }
+
+    private fun recomputeTakeProfit() {
+        if (_uiState.value.takeProfitInputMode != TpInputMode.PRICE) return
+        val state = _uiState.value
+        val tpPrice = state.takeProfitPriceUsd.toDoubleOrNull()
+        val currentPrice = state.currentPrice
+        if (tpPrice == null || tpPrice <= 0 || currentPrice == null) {
+            _uiState.value = state.copy(takeProfitPriceError = null)
+            return
+        }
+        val tpPercent = if (state.side == "long") {
+            (tpPrice - currentPrice) / currentPrice * 100
+        } else {
+            (currentPrice - tpPrice) / currentPrice * 100
+        }
+        if (tpPercent <= 0) {
+            val sideHint = if (state.side == "long") "above" else "below"
+            _uiState.value = state.copy(
+                takeProfitPriceError = "Take-profit price must be $sideHint the current price",
+                takeProfitPercent = ""
+            )
+            return
+        }
+        _uiState.value = state.copy(takeProfitPercent = formatPercent(tpPercent), takeProfitPriceError = null)
     }
 
     fun setStopLossInputMode(mode: SlInputMode) {
@@ -325,6 +367,10 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         }
         if (state.stopLossInputMode == SlInputMode.PRICE && state.stopLossPriceUsd.isNotBlank() && state.stopLossPercent.isBlank()) {
             _uiState.value = state.copy(error = state.stopLossPriceError ?: "Fix the stop-loss price")
+            return
+        }
+        if (state.takeProfitInputMode == TpInputMode.PRICE && state.takeProfitPriceUsd.isNotBlank() && state.takeProfitPercent.isBlank()) {
+            _uiState.value = state.copy(error = state.takeProfitPriceError ?: "Fix the take-profit price")
             return
         }
         val amountUsd = state.amountUsd.toDoubleOrNull()
