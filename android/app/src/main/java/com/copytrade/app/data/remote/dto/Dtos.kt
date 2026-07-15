@@ -253,6 +253,14 @@ data class FuturesPriceDto(
 )
 
 @Serializable
+data class FuturesTodayPnlDto(
+    val mode: String,
+    val realizedPnlUsdt: Double = 0.0,
+    val realizedPnlPercent: Double? = null,
+    val tradesCount: Int = 0
+)
+
+@Serializable
 data class FuturesPositionResponseDto(
     val mode: String,
     val position: FuturesPositionDto? = null,

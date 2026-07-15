@@ -170,6 +170,7 @@ object Strings {
     val stopLossByPercent = Bi("Stop-loss %", "Stop-loss %")
     val stopLossByPrice = Bi("Stop-loss price", "Stop-loss price")
     val stopLossPriceLabel = Bi("Stop-loss price (USD)", "Stop-loss price (USD)")
+    val todaysPnlLabel = Bi("Today's PnL", "PnL ngayong araw")
 }
 
 @Composable

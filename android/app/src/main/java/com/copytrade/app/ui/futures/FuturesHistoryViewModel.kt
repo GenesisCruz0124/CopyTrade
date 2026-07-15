@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.toUserMessage
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
+import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 data class FuturesHistoryUiState(
     val openPositions: List<FuturesPositionDto> = emptyList(),
     val closedPositions: List<FuturesPositionDto> = emptyList(),
+    val todayPnl: FuturesTodayPnlDto? = null,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -34,9 +36,11 @@ class FuturesHistoryViewModel(private val app: CopyTradeApp) : ViewModel() {
                 val repo = app.repositoryFor(url)
                 val open = repo.getFuturesPositions()
                 val closed = repo.getFuturesPositionsHistory()
+                val todayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     openPositions = open,
                     closedPositions = closed,
+                    todayPnl = todayPnl,
                     isLoading = false,
                     error = null
                 )
