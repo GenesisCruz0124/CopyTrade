@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.ui.appViewModel
+import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Bi
 import com.copytrade.app.ui.strings.Strings
@@ -58,7 +59,8 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                 title = { Text(Strings.futuresHistoryTitle.resolve()) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
-                }
+                },
+                actions = { ModeBadge(mode = state.mode, modifier = Modifier.padding(end = 8.dp)) }
             )
         }
     ) { padding ->

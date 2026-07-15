@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.ui.appViewModel
+import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -92,6 +93,7 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
                     IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
                 },
                 actions = {
+                    ModeBadge(mode = state.mode, modifier = Modifier.padding(end = 8.dp))
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Filled.History, contentDescription = Strings.futuresHistoryTitle.resolve())
                     }
