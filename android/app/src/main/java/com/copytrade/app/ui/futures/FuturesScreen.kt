@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -56,9 +57,11 @@ import com.copytrade.app.ui.theme.ProfitGreen
 import java.util.Locale
 import kotlin.math.abs
 
+internal fun formatPrice(price: Double): String = String.format(Locale.US, "%.8f", price).trimEnd('0').trimEnd('.')
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FuturesScreen(onBack: () -> Unit) {
+fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
     val viewModel = appViewModel { FuturesViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -80,6 +83,11 @@ fun FuturesScreen(onBack: () -> Unit) {
                 title = { Text(Strings.futuresTitle.resolve()) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
+                },
+                actions = {
+                    IconButton(onClick = onOpenHistory) {
+                        Icon(Icons.Filled.History, contentDescription = Strings.futuresHistoryTitle.resolve())
+                    }
                 }
             )
         },
@@ -171,6 +179,14 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                     )
                 }
             }
+        }
+        if (state.selectedSymbol.isNotBlank()) {
+            Text(
+                text = state.currentPrice?.let { "${Strings.currentPriceLabel.resolve()}: $${formatPrice(it)}" }
+                    ?: Strings.loading.resolve(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -273,7 +289,7 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
 }
 
 @Composable
-private fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
+internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
     val pnlUsdt = position.unrealizedPnlUsdt
     val pnlPercent = position.unrealizedPnlPercent
     val pnlColor = when {
@@ -295,9 +311,9 @@ private fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
                 )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${Strings.entryPrice.resolve()}: ${position.entryPrice}", style = MaterialTheme.typography.bodyMedium)
+                Text("${Strings.entryPrice.resolve()}: ${formatPrice(position.entryPrice)}", style = MaterialTheme.typography.bodyMedium)
                 position.currentPrice?.let {
-                    Text("${Strings.currentPriceLabel.resolve()}: $it", style = MaterialTheme.typography.bodyMedium)
+                    Text("${Strings.currentPriceLabel.resolve()}: ${formatPrice(it)}", style = MaterialTheme.typography.bodyMedium)
                 }
             }
             if (pnlUsdt != null && pnlPercent != null) {

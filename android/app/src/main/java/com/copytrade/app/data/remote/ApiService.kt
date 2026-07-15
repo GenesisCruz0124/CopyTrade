@@ -10,6 +10,7 @@ import com.copytrade.app.data.remote.dto.EventsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesBalanceResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPositionResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPositionsResponseDto
+import com.copytrade.app.data.remote.dto.FuturesPriceDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolsResponseDto
 import com.copytrade.app.data.remote.dto.OkResponseDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
@@ -86,9 +87,15 @@ interface ApiService {
     @GET("futures/positions")
     suspend fun getFuturesPositions(): FuturesPositionsResponseDto
 
+    @GET("futures/positions/history")
+    suspend fun getFuturesPositionsHistory(@Query("limit") limit: Int = 100): FuturesPositionsResponseDto
+
     @POST("futures/positions")
     suspend fun openFuturesPosition(@Body request: OpenFuturesPositionRequest): FuturesPositionResponseDto
 
     @POST("futures/positions/{id}/close")
     suspend fun closeFuturesPosition(@Path("id") id: String): FuturesPositionResponseDto
+
+    @GET("futures/price/{symbol}")
+    suspend fun getFuturesPrice(@Path("symbol") symbol: String): FuturesPriceDto
 }

@@ -23,6 +23,10 @@ class SettingsRepository(private val context: Context) {
 
     private val serverUrlKey = stringPreferencesKey("server_url")
     private val languageKey = stringPreferencesKey("language")
+    private val futuresOpenTypeKey = stringPreferencesKey("futures_open_type")
+    private val futuresSizingModeKey = stringPreferencesKey("futures_sizing_mode")
+    private val futuresLeverageKey = stringPreferencesKey("futures_leverage")
+    private val futuresSideKey = stringPreferencesKey("futures_side")
 
     private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
@@ -48,12 +52,35 @@ class SettingsRepository(private val context: Context) {
     val authToken: String?
         get() = encryptedPrefs.getString(KEY_TOKEN, null)
 
+    /** Last-used futures trading form selections, so isolated/cross, USD/percent sizing,
+     *  leverage, and side survive an app restart instead of resetting to defaults each time. */
+    val futuresOpenType: Flow<String> = context.dataStore.data.map { it[futuresOpenTypeKey] ?: "isolated" }
+    val futuresSizingMode: Flow<String> = context.dataStore.data.map { it[futuresSizingModeKey] ?: "usd" }
+    val futuresLeverage: Flow<String> = context.dataStore.data.map { it[futuresLeverageKey] ?: "5" }
+    val futuresSide: Flow<String> = context.dataStore.data.map { it[futuresSideKey] ?: "long" }
+
     suspend fun setServerUrl(url: String) {
         context.dataStore.edit { it[serverUrlKey] = url }
     }
 
     suspend fun setLanguage(language: AppLanguage) {
         context.dataStore.edit { it[languageKey] = language.name }
+    }
+
+    suspend fun setFuturesOpenType(openType: String) {
+        context.dataStore.edit { it[futuresOpenTypeKey] = openType }
+    }
+
+    suspend fun setFuturesSizingMode(mode: String) {
+        context.dataStore.edit { it[futuresSizingModeKey] = mode }
+    }
+
+    suspend fun setFuturesLeverage(leverage: String) {
+        context.dataStore.edit { it[futuresLeverageKey] = leverage }
+    }
+
+    suspend fun setFuturesSide(side: String) {
+        context.dataStore.edit { it[futuresSideKey] = side }
     }
 
     fun setAuthToken(token: String) {

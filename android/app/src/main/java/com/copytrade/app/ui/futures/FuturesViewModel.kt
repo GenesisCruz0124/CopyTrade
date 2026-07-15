@@ -16,11 +16,15 @@ import kotlinx.coroutines.launch
 
 enum class SizingMode { USD, PERCENT }
 
+private fun SizingMode.toPrefValue() = if (this == SizingMode.USD) "usd" else "percent"
+private fun String.toSizingMode() = if (this == "percent") SizingMode.PERCENT else SizingMode.USD
+
 data class FuturesUiState(
     val mode: String = "paper",
     val symbols: List<FuturesSymbolDto> = emptyList(),
     val symbolQuery: String = "",
     val selectedSymbol: String = "",
+    val currentPrice: Double? = null,
     val side: String = "long",
     val leverage: String = "5",
     val openType: String = "isolated",
@@ -44,8 +48,21 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     val uiState: StateFlow<FuturesUiState> = _uiState.asStateFlow()
 
     init {
+        loadPersistedSelections()
         loadSymbols()
         refresh()
+    }
+
+    private fun loadPersistedSelections() {
+        viewModelScope.launch {
+            val settings = app.settingsRepository
+            _uiState.value = _uiState.value.copy(
+                openType = settings.futuresOpenType.first(),
+                sizingMode = settings.futuresSizingMode.first().toSizingMode(),
+                leverage = settings.futuresLeverage.first(),
+                side = settings.futuresSide.first()
+            )
+        }
     }
 
     private fun loadSymbols() {
@@ -85,6 +102,23 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
+            refreshPrice()
+        }
+    }
+
+    private fun refreshPrice() {
+        val symbol = _uiState.value.selectedSymbol
+        if (symbol.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                val price = app.repositoryFor(url).getFuturesPrice(symbol)
+                if (_uiState.value.selectedSymbol == symbol) {
+                    _uiState.value = _uiState.value.copy(currentPrice = price)
+                }
+            } catch (_: Exception) {
+                // Best-effort — the price ticker isn't critical enough to surface as an error.
+            }
         }
     }
 
@@ -93,23 +127,28 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     }
 
     fun selectSymbol(symbol: String) {
-        _uiState.value = _uiState.value.copy(selectedSymbol = symbol, symbolQuery = symbol)
+        _uiState.value = _uiState.value.copy(selectedSymbol = symbol, symbolQuery = symbol, currentPrice = null)
+        refreshPrice()
     }
 
     fun setSide(side: String) {
         _uiState.value = _uiState.value.copy(side = side)
+        viewModelScope.launch { app.settingsRepository.setFuturesSide(side) }
     }
 
     fun setLeverage(v: String) {
         _uiState.value = _uiState.value.copy(leverage = v)
+        viewModelScope.launch { app.settingsRepository.setFuturesLeverage(v) }
     }
 
     fun setOpenType(v: String) {
         _uiState.value = _uiState.value.copy(openType = v)
+        viewModelScope.launch { app.settingsRepository.setFuturesOpenType(v) }
     }
 
     fun setSizingMode(mode: SizingMode) {
         _uiState.value = _uiState.value.copy(sizingMode = mode)
+        viewModelScope.launch { app.settingsRepository.setFuturesSizingMode(mode.toPrefValue()) }
     }
 
     fun setAmountUsd(v: String) {
