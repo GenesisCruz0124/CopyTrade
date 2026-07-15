@@ -3,6 +3,7 @@ package com.copytrade.app.ui.futures
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
+import com.copytrade.app.data.remote.toUserMessage
 import com.copytrade.app.data.remote.dto.FuturesBalanceDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolDto
@@ -54,7 +55,9 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 val symbols = app.repositoryFor(url).getFuturesSymbols()
                 _uiState.value = _uiState.value.copy(symbols = symbols, notConfigured = symbols.isEmpty())
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                // The engine returns HTTP 400 (not a 200 with an empty list) when futures
+                // trading isn't configured — treat any failure to load symbols the same way.
+                _uiState.value = _uiState.value.copy(notConfigured = true, error = e.toUserMessage())
             }
         }
     }
@@ -75,7 +78,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                     isLoading = false
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
         }
     }
@@ -165,7 +168,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 _uiState.value = _uiState.value.copy(isSubmitting = false, opened = true)
                 refresh()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isSubmitting = false, error = e.message)
+                _uiState.value = _uiState.value.copy(isSubmitting = false, error = e.toUserMessage())
             }
         }
     }
@@ -177,7 +180,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 app.repositoryFor(url).closeFuturesPosition(id)
                 refresh()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }
