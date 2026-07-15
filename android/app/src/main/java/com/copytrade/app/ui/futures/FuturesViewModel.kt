@@ -7,6 +7,7 @@ import com.copytrade.app.data.remote.toUserMessage
 import com.copytrade.app.data.remote.dto.FuturesBalanceDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolDto
+import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,7 @@ data class FuturesUiState(
     val symbolQuery: String = "",
     val selectedSymbol: String = "",
     val currentPrice: Double? = null,
+    val klines: List<KlineDto> = emptyList(),
     val side: String = "long",
     val leverage: String = "5",
     val openType: String = "isolated",
@@ -90,7 +92,10 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 symbolQuery = symbol,
                 favorites = settings.futuresFavoriteSymbols.first()
             )
-            if (symbol.isNotBlank()) refreshPrice()
+            if (symbol.isNotBlank()) {
+                refreshPrice()
+                refreshKlines()
+            }
         }
     }
 
@@ -133,6 +138,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
             refreshPrice()
+            refreshKlines()
         }
     }
 
@@ -153,14 +159,31 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         }
     }
 
+    private fun refreshKlines() {
+        val symbol = _uiState.value.selectedSymbol
+        if (symbol.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                val klines = app.repositoryFor(url).getFuturesKlines(symbol)
+                if (_uiState.value.selectedSymbol == symbol) {
+                    _uiState.value = _uiState.value.copy(klines = klines)
+                }
+            } catch (_: Exception) {
+                // Best-effort — the chart isn't critical enough to surface as an error.
+            }
+        }
+    }
+
     fun setSymbolQuery(query: String) {
         _uiState.value = _uiState.value.copy(symbolQuery = query)
     }
 
     fun selectSymbol(symbol: String) {
-        _uiState.value = _uiState.value.copy(selectedSymbol = symbol, symbolQuery = symbol, currentPrice = null)
+        _uiState.value = _uiState.value.copy(selectedSymbol = symbol, symbolQuery = symbol, currentPrice = null, klines = emptyList())
         viewModelScope.launch { app.settingsRepository.setFuturesSymbol(symbol) }
         refreshPrice()
+        refreshKlines()
     }
 
     fun toggleFavorite(symbol: String) {

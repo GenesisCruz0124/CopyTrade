@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.ui.appViewModel
+import com.copytrade.app.ui.components.CandlestickChart
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
@@ -231,6 +232,7 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            CandlestickChart(state.klines, modifier = Modifier.fillMaxWidth())
         }
 
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {

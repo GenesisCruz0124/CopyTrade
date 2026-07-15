@@ -51,6 +51,7 @@ object Strings {
     val noOpenOrders = Bi("No open orders", "Walang bukas na order")
     val recentFills = Bi("Recent fills", "Kamakailang fills")
     val pnlChart = Bi("PnL", "PnL")
+    val priceChart = Bi("Price chart", "Price chart")
     val start = Bi("Start", "Simulan")
     val pause = Bi("Pause", "I-pause")
     val stop = Bi("Stop", "Itigil")

@@ -261,6 +261,23 @@ data class FuturesTodayPnlDto(
 )
 
 @Serializable
+data class KlineDto(
+    val openTime: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double
+)
+
+@Serializable
+data class KlinesResponseDto(
+    val mode: String,
+    val symbol: String,
+    val klines: List<KlineDto> = emptyList()
+)
+
+@Serializable
 data class FuturesPositionResponseDto(
     val mode: String,
     val position: FuturesPositionDto? = null,
