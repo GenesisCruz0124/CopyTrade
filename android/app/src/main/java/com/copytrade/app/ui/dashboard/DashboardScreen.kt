@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -56,7 +57,8 @@ fun DashboardScreen(
     onOpenBot: (String) -> Unit,
     onCreateBot: () -> Unit,
     onOpenTradeLog: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenCopySignals: () -> Unit
 ) {
     val viewModel = appViewModel { DashboardViewModel(it) }
     val state by viewModel.uiState.collectAsState()
@@ -72,6 +74,9 @@ fun DashboardScreen(
                     ModeBadge(mode = state.mode, modifier = Modifier.padding(end = 8.dp))
                     IconButton(onClick = onOpenTradeLog) {
                         Icon(Icons.Filled.List, contentDescription = Strings.tradeLogTitle.resolve())
+                    }
+                    IconButton(onClick = onOpenCopySignals) {
+                        Icon(Icons.Filled.Notifications, contentDescription = Strings.copySignalsTitle.resolve())
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = Strings.settingsTitle.resolve())

@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { readFile } from "node:fs/promises";
 import type Database from "better-sqlite3";
 import { env, isLiveMode } from "../config/env.js";
 import { logger } from "../logger.js";
@@ -6,6 +7,7 @@ import { BotManager } from "../botManager.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
 import type { ExchangeClient } from "../exchange/ExchangeClient.js";
 import { botConfigSchema } from "../config/botConfigSchema.js";
+import type { CopySignalService } from "../copySignals/copySignalService.js";
 
 export interface ApiServerDeps {
   db: Database.Database;
@@ -13,6 +15,7 @@ export interface ApiServerDeps {
   safety: SafetyRails;
   botManager: BotManager;
   startedAt: number;
+  copySignals?: CopySignalService;
 }
 
 function modeOf(): "paper" | "live" {
@@ -113,6 +116,59 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
   app.post("/killswitch", async (_req, reply) => {
     await deps.safety.engageKillSwitch();
     reply.send({ mode: modeOf(), ok: true });
+  });
+
+  app.get<{ Querystring: { status?: string } }>("/copy-signals", async (req, reply) => {
+    if (!deps.copySignals) {
+      reply.send({ mode: modeOf(), signals: [] });
+      return;
+    }
+    const status = req.query.status as any;
+    reply.send({ mode: modeOf(), signals: deps.copySignals.list(status) });
+  });
+
+  app.get<{ Params: { id: string } }>("/copy-signals/:id/image", async (req, reply) => {
+    if (!deps.copySignals) {
+      reply.code(404).send({ mode: modeOf(), error: "copy trading not configured" });
+      return;
+    }
+    const signal = deps.copySignals.get(req.params.id);
+    if (!signal?.image_path) {
+      reply.code(404).send({ mode: modeOf(), error: "signal or image not found" });
+      return;
+    }
+    try {
+      const buffer = await readFile(signal.image_path);
+      reply.type("image/png").send(buffer);
+    } catch {
+      reply.code(404).send({ mode: modeOf(), error: "image file missing" });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/copy-signals/:id/approve", async (req, reply) => {
+    if (!deps.copySignals) {
+      reply.code(400).send({ mode: modeOf(), error: "copy trading not configured" });
+      return;
+    }
+    try {
+      const signal = await deps.copySignals.approve(req.params.id);
+      reply.send({ mode: modeOf(), signal });
+    } catch (err) {
+      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/copy-signals/:id/reject", async (req, reply) => {
+    if (!deps.copySignals) {
+      reply.code(400).send({ mode: modeOf(), error: "copy trading not configured" });
+      return;
+    }
+    try {
+      const signal = deps.copySignals.reject(req.params.id);
+      reply.send({ mode: modeOf(), signal });
+    } catch (err) {
+      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
   });
 
   return app;

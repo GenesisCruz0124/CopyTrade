@@ -4,7 +4,7 @@ export function runMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS bots (
       id TEXT PRIMARY KEY,
-      type TEXT NOT NULL CHECK (type IN ('grid', 'dca')),
+      type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca')),
       symbol TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
       config TEXT NOT NULL,
@@ -13,6 +13,9 @@ export function runMigrations(db: Database.Database): void {
       allocated_usdt REAL NOT NULL DEFAULT 0,
       daily_loss_limit_usdt REAL,
       realized_pnl_usdt REAL NOT NULL DEFAULT 0,
+      market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
+      leverage REAL,
+      margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -66,9 +69,72 @@ export function runMigrations(db: Database.Database): void {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS copy_signals (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL DEFAULT 'discord',
+      channel_message_id TEXT,
+      image_path TEXT,
+      symbol TEXT,
+      side TEXT CHECK (side IN ('long', 'short')),
+      leverage REAL,
+      entry_price REAL,
+      stop_loss REAL,
+      take_profit REAL,
+      confidence REAL,
+      raw_extraction TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED')),
+      order_id TEXT,
+      failure_reason TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_orders_bot_id ON orders(bot_id);
     CREATE INDEX IF NOT EXISTS idx_fills_bot_id ON fills(bot_id);
     CREATE INDEX IF NOT EXISTS idx_pnl_bot_id ON pnl_snapshots(bot_id);
     CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
+    CREATE INDEX IF NOT EXISTS idx_copy_signals_status ON copy_signals(status);
   `);
+
+  migrateBotsTableForFutures(db);
+}
+
+/**
+ * bots.type and bots.market may pre-date futures support (a DB created before
+ * this migration). SQLite can't alter a CHECK constraint or add a CHECK'd
+ * column after the fact, so detect the old schema and rebuild the table,
+ * preserving all rows, rather than requiring a fresh database.
+ */
+function migrateBotsTableForFutures(db: Database.Database): void {
+  const columns = db.prepare(`PRAGMA table_info(bots)`).all() as { name: string }[];
+  const hasMarketColumn = columns.some((c) => c.name === "market");
+  if (hasMarketColumn) return;
+
+  db.transaction(() => {
+    db.exec(`ALTER TABLE bots RENAME TO bots_old`);
+    db.exec(`
+      CREATE TABLE bots (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca')),
+        symbol TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
+        config TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT '{}',
+        confirm_live INTEGER NOT NULL DEFAULT 0,
+        allocated_usdt REAL NOT NULL DEFAULT 0,
+        daily_loss_limit_usdt REAL,
+        realized_pnl_usdt REAL NOT NULL DEFAULT 0,
+        market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
+        leverage REAL,
+        margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+    db.exec(`
+      INSERT INTO bots (id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at)
+      SELECT id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at FROM bots_old
+    `);
+    db.exec(`DROP TABLE bots_old`);
+  })();
 }

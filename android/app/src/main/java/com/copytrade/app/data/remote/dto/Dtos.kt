@@ -119,6 +119,37 @@ data class CreateGridBotRequest(
 )
 
 @Serializable
+data class CopySignalDto(
+    val id: String,
+    val source: String,
+    @kotlinx.serialization.SerialName("channel_message_id") val channelMessageId: String? = null,
+    val symbol: String? = null,
+    val side: String? = null,
+    val leverage: Double? = null,
+    @kotlinx.serialization.SerialName("entry_price") val entryPrice: Double? = null,
+    @kotlinx.serialization.SerialName("stop_loss") val stopLoss: Double? = null,
+    @kotlinx.serialization.SerialName("take_profit") val takeProfit: Double? = null,
+    val confidence: Double? = null,
+    val status: String,
+    @kotlinx.serialization.SerialName("order_id") val orderId: String? = null,
+    @kotlinx.serialization.SerialName("failure_reason") val failureReason: String? = null,
+    @kotlinx.serialization.SerialName("created_at") val createdAt: Long
+)
+
+@Serializable
+data class CopySignalsResponseDto(
+    val mode: String,
+    val signals: List<CopySignalDto>
+)
+
+@Serializable
+data class CopySignalResponseDto(
+    val mode: String,
+    val signal: CopySignalDto? = null,
+    val error: String? = null
+)
+
+@Serializable
 data class CreateDcaBotRequest(
     val type: String = "dca",
     val symbol: String,

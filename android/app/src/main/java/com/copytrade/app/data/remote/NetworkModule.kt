@@ -28,20 +28,24 @@ private class AuthInterceptor(private val settings: SettingsRepository) : Interc
 
 /** Builds a fresh ApiService bound to the current server URL. Rebuild after the URL changes in Settings. */
 fun buildApiService(baseUrl: String, settings: SettingsRepository): ApiService {
-    val normalizedUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-
-    val client = OkHttpClient.Builder()
-        .addInterceptor(AuthInterceptor(settings))
-        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
-
+    val client = buildAuthenticatedHttpClient(settings)
     val contentType = "application/json".toMediaType()
     return Retrofit.Builder()
-        .baseUrl(normalizedUrl)
+        .baseUrl(normalizeBaseUrl(baseUrl))
         .client(client)
         .addConverterFactory(json.asConverterFactory(contentType))
         .build()
         .create(ApiService::class.java)
 }
+
+/** Shared authenticated OkHttp client — used by Retrofit and by Coil for loading copy-signal thumbnails. */
+fun buildAuthenticatedHttpClient(settings: SettingsRepository): OkHttpClient {
+    return OkHttpClient.Builder()
+        .addInterceptor(AuthInterceptor(settings))
+        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+}
+
+fun normalizeBaseUrl(baseUrl: String): String = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"

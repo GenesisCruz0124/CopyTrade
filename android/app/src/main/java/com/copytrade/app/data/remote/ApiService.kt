@@ -2,6 +2,8 @@ package com.copytrade.app.data.remote
 
 import com.copytrade.app.data.remote.dto.BotResponseDto
 import com.copytrade.app.data.remote.dto.BotsResponseDto
+import com.copytrade.app.data.remote.dto.CopySignalResponseDto
+import com.copytrade.app.data.remote.dto.CopySignalsResponseDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.EventsResponseDto
@@ -52,4 +54,13 @@ interface ApiService {
 
     @POST("killswitch")
     suspend fun killSwitch(): OkResponseDto
+
+    @GET("copy-signals")
+    suspend fun getCopySignals(@Query("status") status: String? = null): CopySignalsResponseDto
+
+    @POST("copy-signals/{id}/approve")
+    suspend fun approveCopySignal(@Path("id") id: String): CopySignalResponseDto
+
+    @POST("copy-signals/{id}/reject")
+    suspend fun rejectCopySignal(@Path("id") id: String): CopySignalResponseDto
 }
