@@ -1,11 +1,14 @@
 package com.copytrade.app
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import androidx.room.Room
 import com.copytrade.app.data.local.AppDatabase
 import com.copytrade.app.data.remote.ApiService
 import com.copytrade.app.data.remote.buildApiService
 import com.copytrade.app.data.repository.EngineRepository
+import com.copytrade.app.notifications.COPY_SIGNALS_NOTIFICATION_CHANNEL_ID
 import com.copytrade.app.settings.SettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -29,6 +32,16 @@ class CopyTradeApp : Application() {
         super.onCreate()
         database = Room.databaseBuilder(this, AppDatabase::class.java, "copytrade.db").build()
         settingsRepository = SettingsRepository(this)
+        createCopySignalsNotificationChannel()
+    }
+
+    private fun createCopySignalsNotificationChannel() {
+        val channel = NotificationChannel(
+            COPY_SIGNALS_NOTIFICATION_CHANNEL_ID,
+            "Copy Signals",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
     /** Rebuilds the Retrofit-backed repository if the server URL changed since the last call. */
