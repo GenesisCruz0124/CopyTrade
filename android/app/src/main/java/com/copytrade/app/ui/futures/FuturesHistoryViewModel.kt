@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class FuturesHistoryUiState(
+    val mode: String = "paper",
     val openPositions: List<FuturesPositionDto> = emptyList(),
     val closedPositions: List<FuturesPositionDto> = emptyList(),
     val todayPnl: FuturesTodayPnlDto? = null,
@@ -34,10 +35,12 @@ class FuturesHistoryViewModel(private val app: CopyTradeApp) : ViewModel() {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val repo = app.repositoryFor(url)
+                val status = repo.getStatus()
                 val open = repo.getFuturesPositions()
                 val closed = repo.getFuturesPositionsHistory()
                 val todayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
                 _uiState.value = _uiState.value.copy(
+                    mode = status.mode,
                     openPositions = open,
                     closedPositions = closed,
                     todayPnl = todayPnl,
