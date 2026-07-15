@@ -115,7 +115,39 @@ export function runMigrations(db: Database.Database): void {
       closed_at INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS futures_pending_orders (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL CHECK (side IN ('long', 'short')),
+      leverage REAL NOT NULL,
+      open_type TEXT NOT NULL CHECK (open_type IN ('isolated', 'cross')),
+      limit_price REAL NOT NULL,
+      quantity REAL NOT NULL,
+      contract_size REAL NOT NULL,
+      sizing_mode TEXT NOT NULL CHECK (sizing_mode IN ('usd', 'percent')),
+      sizing_usd_amount REAL,
+      sizing_percent REAL,
+      margin_usdt REAL NOT NULL,
+      take_profit_percent REAL,
+      stop_loss_percent REAL,
+      risk_usdt REAL,
+      taker_fee_rate REAL,
+      order_id TEXT NOT NULL,
+      external_oid TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'partially_filled', 'filled', 'canceled', 'failed')),
+      filled_quantity REAL NOT NULL DEFAULT 0,
+      filled_price REAL,
+      filled_at INTEGER,
+      position_id TEXT REFERENCES futures_positions(id),
+      cancel_reason TEXT,
+      last_checked_at INTEGER,
+      last_check_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_futures_positions_status ON futures_positions(status);
+    CREATE INDEX IF NOT EXISTS idx_futures_pending_orders_status ON futures_pending_orders(status);
     CREATE INDEX IF NOT EXISTS idx_orders_bot_id ON orders(bot_id);
     CREATE INDEX IF NOT EXISTS idx_fills_bot_id ON fills(bot_id);
     CREATE INDEX IF NOT EXISTS idx_pnl_bot_id ON pnl_snapshots(bot_id);

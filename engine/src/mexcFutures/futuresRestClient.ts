@@ -6,6 +6,7 @@ import type {
   FuturesContractDetail,
   FuturesKline,
   FuturesOrderResult,
+  FuturesOrderStatus,
   FuturesPlaceOrderParams,
   FuturesPosition,
   FuturesTicker
@@ -191,8 +192,13 @@ export class FuturesRestClient {
     if (params.type === "LIMIT") body.price = params.price!;
 
     try {
-      const raw = await this.request<any>("POST", "/private/order/submit", body, { signed: true, queue: this.orderQueue });
-      return { orderId: String(raw.orderId), externalOid: params.externalOid, symbol: params.symbol, state: "NEW" };
+      // MEXC's response `data` for order/submit is the bare order ID (a number),
+      // not `{ orderId }` — verified live 2026-07-15.
+      const orderId = await this.request<number | string>("POST", "/private/order/submit", body, {
+        signed: true,
+        queue: this.orderQueue
+      });
+      return { orderId: String(orderId), externalOid: params.externalOid, symbol: params.symbol, state: "NEW" };
     } catch (err) {
       if (err instanceof FuturesOrderStatusUnknownError) {
         logger.warn({ externalOid: params.externalOid }, "futures order status unknown after submit; reconcile via position/order query");
@@ -203,6 +209,21 @@ export class FuturesRestClient {
 
   async cancelOrder(orderId: string): Promise<void> {
     await this.request("POST", "/private/order/cancel", { orderIds: [orderId] } as any, { signed: true, queue: this.orderQueue });
+  }
+
+  async getOrder(orderId: string): Promise<FuturesOrderStatus> {
+    const raw = await this.request<any>("GET", `/private/order/get/${orderId}`, {}, { signed: true, queue: this.generalQueue });
+    return mapOrderStatus(raw);
+  }
+
+  async openOrders(symbol: string): Promise<FuturesOrderStatus[]> {
+    const raw = await this.request<any[]>(
+      "GET",
+      `/private/order/list/open_orders/${symbol}`,
+      {},
+      { signed: true, queue: this.generalQueue }
+    );
+    return raw.map(mapOrderStatus);
   }
 
   async openPositions(symbol?: string): Promise<FuturesPosition[]> {
@@ -233,4 +254,25 @@ export class FuturesRestClient {
       equity: Number(raw.equity)
     };
   }
+}
+
+function mapOrderStatus(raw: any): FuturesOrderStatus {
+  return {
+    orderId: String(raw.orderId),
+    symbol: raw.symbol,
+    externalOid: raw.externalOid,
+    state: Number(raw.state) as FuturesOrderStatus["state"],
+    side: Number(raw.side) as FuturesOrderStatus["side"],
+    openType: raw.openType === 1 ? "isolated" : "cross",
+    orderType: Number(raw.orderType) === 5 ? "MARKET" : "LIMIT",
+    leverage: Number(raw.leverage),
+    price: Number(raw.price),
+    vol: Number(raw.vol),
+    dealVol: Number(raw.dealVol),
+    dealAvgPrice: Number(raw.dealAvgPrice),
+    takerFeeRate: Number(raw.takerFeeRate),
+    makerFeeRate: Number(raw.makerFeeRate),
+    createTime: Number(raw.createTime),
+    updateTime: Number(raw.updateTime)
+  };
 }
