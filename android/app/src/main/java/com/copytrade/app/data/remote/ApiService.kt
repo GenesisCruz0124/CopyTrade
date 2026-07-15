@@ -12,6 +12,7 @@ import com.copytrade.app.data.remote.dto.FuturesPositionResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPositionsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPriceDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolsResponseDto
+import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.data.remote.dto.OkResponseDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.OrdersResponseDto
@@ -98,4 +99,7 @@ interface ApiService {
 
     @GET("futures/price/{symbol}")
     suspend fun getFuturesPrice(@Path("symbol") symbol: String): FuturesPriceDto
+
+    @GET("futures/pnl/today")
+    suspend fun getFuturesTodayPnl(): FuturesTodayPnlDto
 }

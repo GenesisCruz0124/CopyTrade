@@ -239,6 +239,14 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     reply.send({ mode: modeOf(), positions });
   });
 
+  app.get("/futures/pnl/today", async (_req, reply) => {
+    if (!deps.futuresPositions) {
+      reply.send({ mode: modeOf(), realizedPnlUsdt: 0, realizedPnlPercent: null, tradesCount: 0 });
+      return;
+    }
+    reply.send({ mode: modeOf(), ...deps.futuresPositions.todaysPnl() });
+  });
+
   app.post("/futures/positions", async (req, reply) => {
     if (!deps.futuresPositions) {
       reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });

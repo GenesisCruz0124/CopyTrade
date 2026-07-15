@@ -169,7 +169,21 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor()
-                    .onFocusChanged { if (it.isFocused) expanded = true }
+                    .onFocusChanged { focus ->
+                        if (focus.isFocused) {
+                            expanded = true
+                            // Tapping a field that still shows the previously picked symbol only ever
+                            // matched itself in the dropdown, making it look locked — clear it so the
+                            // full/favorites list shows and typing starts a fresh search.
+                            if (state.symbolQuery.isNotBlank() && state.symbolQuery == state.selectedSymbol) {
+                                viewModel.setSymbolQuery("")
+                            }
+                        } else if (state.symbolQuery.isBlank() && state.selectedSymbol.isNotBlank()) {
+                            // Tapped away without picking anything — restore the prior selection
+                            // instead of leaving the field empty.
+                            viewModel.setSymbolQuery(state.selectedSymbol)
+                        }
+                    }
             )
             ExposedDropdownMenu(
                 expanded = expanded && filteredSymbols.isNotEmpty(),

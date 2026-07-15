@@ -284,6 +284,23 @@ export class FuturesPositionManager {
     return views;
   }
 
+  /** Realized PnL (USD and %) across positions closed since local midnight today. */
+  todaysPnl(): { realizedPnlUsdt: number; realizedPnlPercent: number | null; tradesCount: number } {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const row = this.db
+      .prepare(
+        `SELECT COALESCE(SUM(realized_pnl_usdt), 0) as pnl, COALESCE(SUM(margin_usdt), 0) as margin, COUNT(*) as trades
+         FROM futures_positions WHERE status = 'closed' AND closed_at >= ?`
+      )
+      .get(startOfDay.getTime()) as { pnl: number; margin: number; trades: number };
+    return {
+      realizedPnlUsdt: row.pnl,
+      realizedPnlPercent: row.margin > 0 ? (row.pnl / row.margin) * 100 : null,
+      tradesCount: row.trades
+    };
+  }
+
   /** Polls open positions and auto-closes any that crossed their TP/SL price. */
   async monitor(): Promise<void> {
     const rows = this.db.prepare(`SELECT * FROM futures_positions WHERE status = 'open'`).all() as FuturesPositionRow[];

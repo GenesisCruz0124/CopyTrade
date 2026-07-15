@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
+import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Bi
@@ -62,6 +63,8 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxWidth().padding(padding)) {
+            state.todayPnl?.let { TodayPnlCard(it, modifier = Modifier.fillMaxWidth().padding(16.dp)) }
+
             TabRow(selectedTabIndex = tabIndex) {
                 Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text(Strings.openTab.resolve()) })
                 Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(Strings.historyTab.resolve()) })
@@ -98,6 +101,37 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                             ClosedPositionCard(position = position)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayPnlCard(pnl: FuturesTodayPnlDto, modifier: Modifier = Modifier) {
+    val color = when {
+        pnl.realizedPnlUsdt > 0 -> ProfitGreen
+        pnl.realizedPnlUsdt < 0 -> LossRed
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val sign = if (pnl.realizedPnlUsdt > 0) "+" else if (pnl.realizedPnlUsdt < 0) "-" else ""
+
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(Strings.todaysPnlLabel.resolve(), style = MaterialTheme.typography.bodyMedium)
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(
+                    "$sign$${"%.2f".format(abs(pnl.realizedPnlUsdt))}",
+                    color = color,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                pnl.realizedPnlPercent?.let {
+                    Text(
+                        " ($sign${"%.2f".format(abs(it))}%)",
+                        color = color,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         }
