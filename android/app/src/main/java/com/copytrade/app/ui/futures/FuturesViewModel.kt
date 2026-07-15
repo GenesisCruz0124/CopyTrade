@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 enum class SizingMode { USD, PERCENT }
+enum class SlInputMode { PERCENT, PRICE }
 
 private fun SizingMode.toPrefValue() = if (this == SizingMode.USD) "usd" else "percent"
 private fun String.toSizingMode() = if (this == "percent") SizingMode.PERCENT else SizingMode.USD
@@ -24,9 +25,12 @@ private fun formatPercent(v: Double): String {
     return rounded.ifEmpty { "0" }
 }
 
+private fun formatAmount(v: Double): String = String.format(java.util.Locale.US, "%.2f", v)
+
 data class FuturesUiState(
     val mode: String = "paper",
     val symbols: List<FuturesSymbolDto> = emptyList(),
+    val favorites: Set<String> = emptySet(),
     val symbolQuery: String = "",
     val selectedSymbol: String = "",
     val currentPrice: Double? = null,
@@ -37,7 +41,10 @@ data class FuturesUiState(
     val amountUsd: String = "",
     val percentOfBalance: String = "",
     val takeProfitPercent: String = "",
+    val stopLossInputMode: SlInputMode = SlInputMode.PERCENT,
     val stopLossPercent: String = "",
+    val stopLossPriceUsd: String = "",
+    val stopLossPriceError: String? = null,
     val riskUsdAmount: String = "",
     val balance: FuturesBalanceDto? = null,
     val positions: List<FuturesPositionDto> = emptyList(),
@@ -80,7 +87,8 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 leverage = settings.futuresLeverage.first(),
                 side = settings.futuresSide.first(),
                 selectedSymbol = symbol,
-                symbolQuery = symbol
+                symbolQuery = symbol,
+                favorites = settings.futuresFavoriteSymbols.first()
             )
             if (symbol.isNotBlank()) refreshPrice()
         }
@@ -120,6 +128,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                     isLoading = false,
                     error = positionsResult.exceptionOrNull()?.toUserMessage()
                 )
+                recomputeStopLoss()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
@@ -136,6 +145,7 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 val price = app.repositoryFor(url).getFuturesPrice(symbol)
                 if (_uiState.value.selectedSymbol == symbol) {
                     _uiState.value = _uiState.value.copy(currentPrice = price)
+                    recomputeStopLoss()
                 }
             } catch (_: Exception) {
                 // Best-effort — the price ticker isn't critical enough to surface as an error.
@@ -153,16 +163,22 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         refreshPrice()
     }
 
+    fun toggleFavorite(symbol: String) {
+        val favorites = _uiState.value.favorites
+        _uiState.value = _uiState.value.copy(favorites = if (symbol in favorites) favorites - symbol else favorites + symbol)
+        viewModelScope.launch { app.settingsRepository.toggleFuturesFavoriteSymbol(symbol) }
+    }
+
     fun setSide(side: String) {
         _uiState.value = _uiState.value.copy(side = side)
         viewModelScope.launch { app.settingsRepository.setFuturesSide(side) }
-        recomputeStopLossFromRisk()
+        recomputeStopLoss()
     }
 
     fun setLeverage(v: String) {
         _uiState.value = _uiState.value.copy(leverage = v)
         viewModelScope.launch { app.settingsRepository.setFuturesLeverage(v) }
-        recomputeStopLossFromRisk()
+        recomputeStopLoss()
     }
 
     fun setOpenType(v: String) {
@@ -173,21 +189,26 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
     fun setSizingMode(mode: SizingMode) {
         _uiState.value = _uiState.value.copy(sizingMode = mode)
         viewModelScope.launch { app.settingsRepository.setFuturesSizingMode(mode.toPrefValue()) }
-        recomputeStopLossFromRisk()
+        recomputeStopLoss()
     }
 
     fun setAmountUsd(v: String) {
         _uiState.value = _uiState.value.copy(amountUsd = v)
-        recomputeStopLossFromRisk()
+        recomputeStopLoss()
     }
 
     fun setPercentOfBalance(v: String) {
         _uiState.value = _uiState.value.copy(percentOfBalance = v)
-        recomputeStopLossFromRisk()
+        recomputeStopLoss()
     }
 
     fun setTakeProfitPercent(v: String) {
         _uiState.value = _uiState.value.copy(takeProfitPercent = v)
+    }
+
+    fun setStopLossInputMode(mode: SlInputMode) {
+        _uiState.value = _uiState.value.copy(stopLossInputMode = mode, stopLossPriceError = null)
+        recomputeStopLoss()
     }
 
     fun setStopLossPercent(v: String) {
@@ -195,13 +216,27 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         _uiState.value = _uiState.value.copy(stopLossPercent = v, riskUsdAmount = "")
     }
 
-    /** Alternative stop-loss input: "I'm willing to lose $X" auto-fills the Stop-loss (%) field. */
-    fun setRiskUsdAmount(v: String) {
-        _uiState.value = _uiState.value.copy(riskUsdAmount = v)
-        recomputeStopLossFromRisk()
+    fun setStopLossPriceUsd(v: String) {
+        _uiState.value = _uiState.value.copy(stopLossPriceUsd = v)
+        recomputeStopLoss()
     }
 
-    private fun recomputeStopLossFromRisk() {
+    /** Alternative stop-loss input: "I'm willing to lose $X" auto-fills either the
+     *  Stop-loss (%) field (percent mode) or the position size (price mode). */
+    fun setRiskUsdAmount(v: String) {
+        _uiState.value = _uiState.value.copy(riskUsdAmount = v)
+        recomputeStopLoss()
+    }
+
+    private fun recomputeStopLoss() {
+        when (_uiState.value.stopLossInputMode) {
+            SlInputMode.PERCENT -> recomputeStopLossPercentFromRisk()
+            SlInputMode.PRICE -> recomputeFromStopLossPrice()
+        }
+    }
+
+    /** Percent mode: risk amount + position size + leverage -> stop-loss %. */
+    private fun recomputeStopLossPercentFromRisk() {
         val state = _uiState.value
         val riskUsd = state.riskUsdAmount.toDoubleOrNull() ?: return
         val margin = state.impliedMarginUsdt ?: return
@@ -209,6 +244,45 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         if (riskUsd <= 0 || margin <= 0 || leverage <= 0) return
         val percent = riskUsd / (margin * leverage) * 100
         _uiState.value = _uiState.value.copy(stopLossPercent = formatPercent(percent))
+    }
+
+    /** Price mode: stop-loss price -> stop-loss %, and (if a risk amount is set) -> position size. */
+    private fun recomputeFromStopLossPrice() {
+        val state = _uiState.value
+        val slPrice = state.stopLossPriceUsd.toDoubleOrNull()
+        val currentPrice = state.currentPrice
+        if (slPrice == null || slPrice <= 0 || currentPrice == null) {
+            _uiState.value = state.copy(stopLossPriceError = null)
+            return
+        }
+        val slPercent = if (state.side == "long") {
+            (currentPrice - slPrice) / currentPrice * 100
+        } else {
+            (slPrice - currentPrice) / currentPrice * 100
+        }
+        if (slPercent <= 0 || slPercent >= 100) {
+            val sideHint = if (state.side == "long") "below" else "above"
+            _uiState.value = state.copy(
+                stopLossPriceError = "Stop-loss price must be $sideHint the current price",
+                stopLossPercent = ""
+            )
+            return
+        }
+
+        var newState = state.copy(stopLossPercent = formatPercent(slPercent), stopLossPriceError = null)
+        val leverage = state.leverage.toDoubleOrNull()
+        val riskUsd = state.riskUsdAmount.toDoubleOrNull()
+        if (leverage != null && leverage > 0 && riskUsd != null && riskUsd > 0) {
+            val marginUsdt = riskUsd / (leverage * slPercent / 100)
+            newState = when (state.sizingMode) {
+                SizingMode.USD -> newState.copy(amountUsd = formatAmount(marginUsdt))
+                SizingMode.PERCENT -> {
+                    val bal = state.balance?.availableBalance
+                    if (bal != null && bal > 0) newState.copy(percentOfBalance = formatPercent(marginUsdt / bal * 100)) else newState
+                }
+            }
+        }
+        _uiState.value = newState
     }
 
     fun setConfirmLive(v: Boolean) {
@@ -224,6 +298,10 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         val leverage = state.leverage.toDoubleOrNull()
         if (leverage == null || leverage <= 0) {
             _uiState.value = state.copy(error = "Enter a valid leverage")
+            return
+        }
+        if (state.stopLossInputMode == SlInputMode.PRICE && state.stopLossPriceUsd.isNotBlank() && state.stopLossPercent.isBlank()) {
+            _uiState.value = state.copy(error = state.stopLossPriceError ?: "Fix the stop-loss price")
             return
         }
         val amountUsd = state.amountUsd.toDoubleOrNull()

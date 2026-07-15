@@ -139,7 +139,9 @@ export class FuturesRestClient {
       maxVol: Number(raw.maxVol),
       minLeverage: Number(raw.minLeverage ?? 1),
       maxLeverage: Number(raw.maxLeverage),
-      maintenanceMarginRate: Number(raw.maintenanceMarginRate ?? 0.005)
+      maintenanceMarginRate: Number(raw.maintenanceMarginRate ?? 0.005),
+      // MEXC's default USDT-margined taker fee if the contract doesn't report its own rate.
+      takerFeeRate: Number(raw.takerFeeRate ?? 0.0006)
     };
   }
 

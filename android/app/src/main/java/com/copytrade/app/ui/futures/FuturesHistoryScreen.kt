@@ -155,12 +155,21 @@ private fun ClosedPositionCard(position: FuturesPositionDto) {
                     fontWeight = FontWeight.Bold
                 )
             }
-            position.riskUsdt?.let {
-                Text(
-                    "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                position.riskUsdt?.let {
+                    Text(
+                        "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                position.totalFeeUsdt?.let {
+                    Text(
+                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

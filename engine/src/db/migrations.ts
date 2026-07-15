@@ -102,6 +102,9 @@ export function runMigrations(db: Database.Database): void {
       take_profit_price REAL,
       stop_loss_price REAL,
       risk_usdt REAL,
+      taker_fee_rate REAL,
+      open_fee_usdt REAL,
+      close_fee_usdt REAL,
       status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
       close_price REAL,
       close_reason TEXT,
@@ -121,15 +124,18 @@ export function runMigrations(db: Database.Database): void {
   `);
 
   migrateBotsTableForFutures(db);
-  migrateFuturesPositionsRiskColumn(db);
+  migrateFuturesPositionsColumn(db, "risk_usdt");
+  migrateFuturesPositionsColumn(db, "taker_fee_rate");
+  migrateFuturesPositionsColumn(db, "open_fee_usdt");
+  migrateFuturesPositionsColumn(db, "close_fee_usdt");
 }
 
-/** risk_usdt is a plain nullable REAL column added after futures_positions already
- *  shipped — no CHECK constraint involved, so a simple ALTER TABLE covers it. */
-function migrateFuturesPositionsRiskColumn(db: Database.Database): void {
+/** All of these are plain nullable REAL columns added after futures_positions already
+ *  shipped — no CHECK constraint involved, so a simple ALTER TABLE covers each one. */
+function migrateFuturesPositionsColumn(db: Database.Database, column: string): void {
   const columns = db.prepare(`PRAGMA table_info(futures_positions)`).all() as { name: string }[];
-  if (columns.some((c) => c.name === "risk_usdt")) return;
-  db.exec(`ALTER TABLE futures_positions ADD COLUMN risk_usdt REAL`);
+  if (columns.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE futures_positions ADD COLUMN ${column} REAL`);
 }
 
 /**

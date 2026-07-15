@@ -12,6 +12,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -54,6 +56,7 @@ import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
+import com.copytrade.app.ui.theme.PaperOrange
 import com.copytrade.app.ui.theme.ProfitGreen
 import java.util.Locale
 import kotlin.math.abs
@@ -142,13 +145,14 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
 @Composable
 private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel) {
     var expanded by remember { mutableStateOf(false) }
-    val filteredSymbols = remember(state.symbols, state.symbolQuery) {
+    val filteredSymbols = remember(state.symbols, state.symbolQuery, state.favorites) {
         val matches = if (state.symbolQuery.isBlank()) {
             state.symbols
         } else {
             state.symbols.filter { it.symbol.contains(state.symbolQuery.uppercase()) }
         }
-        matches.take(50)
+        val (favorites, others) = matches.partition { it.symbol in state.favorites }
+        (favorites.sortedBy { it.symbol } + others).take(50)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -172,8 +176,18 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                 onDismissRequest = { expanded = false }
             ) {
                 filteredSymbols.forEach { symbol ->
+                    val isFavorite = symbol.symbol in state.favorites
                     DropdownMenuItem(
                         text = { Text("${symbol.symbol} (max ${symbol.maxLeverage.toInt()}x)") },
+                        leadingIcon = {
+                            IconButton(onClick = { viewModel.toggleFavorite(symbol.symbol) }) {
+                                Icon(
+                                    if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = null,
+                                    tint = if (isFavorite) PaperOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
                         onClick = {
                             viewModel.selectSymbol(symbol.symbol)
                             expanded = false
@@ -263,18 +277,50 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
-            value = state.stopLossPercent,
-            onValueChange = viewModel::setStopLossPercent,
-            label = { Text(Strings.stopLossPercentLabel.resolve()) },
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth()
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = state.stopLossInputMode == SlInputMode.PERCENT,
+                onClick = { viewModel.setStopLossInputMode(SlInputMode.PERCENT) },
+                shape = SegmentedButtonDefaults.itemShape(0, 2)
+            ) { Text(Strings.stopLossByPercent.resolve()) }
+            SegmentedButton(
+                selected = state.stopLossInputMode == SlInputMode.PRICE,
+                onClick = { viewModel.setStopLossInputMode(SlInputMode.PRICE) },
+                shape = SegmentedButtonDefaults.itemShape(1, 2)
+            ) { Text(Strings.stopLossByPrice.resolve()) }
+        }
+        if (state.stopLossInputMode == SlInputMode.PERCENT) {
+            OutlinedTextField(
+                value = state.stopLossPercent,
+                onValueChange = viewModel::setStopLossPercent,
+                label = { Text(Strings.stopLossPercentLabel.resolve()) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            OutlinedTextField(
+                value = state.stopLossPriceUsd,
+                onValueChange = viewModel::setStopLossPriceUsd,
+                label = { Text(Strings.stopLossPriceLabel.resolve()) },
+                isError = state.stopLossPriceError != null,
+                supportingText = state.stopLossPriceError?.let { { Text(it, color = LossRed) } },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         OutlinedTextField(
             value = state.riskUsdAmount,
             onValueChange = viewModel::setRiskUsdAmount,
             label = { Text(Strings.riskUsdAmountLabel.resolve()) },
-            supportingText = { Text(Strings.riskUsdAmountHint.resolve()) },
+            supportingText = {
+                Text(
+                    if (state.stopLossInputMode == SlInputMode.PERCENT) {
+                        Strings.riskUsdAmountHintPercent.resolve()
+                    } else {
+                        Strings.riskUsdAmountHintPrice.resolve()
+                    }
+                )
+            },
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
         )
@@ -335,12 +381,21 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
                     fontWeight = FontWeight.Bold
                 )
             }
-            position.riskUsdt?.let {
-                Text(
-                    "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                position.riskUsdt?.let {
+                    Text(
+                        "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                position.totalFeeUsdt?.let {
+                    Text(
+                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text(Strings.closePosition.resolve(), color = LossRed)

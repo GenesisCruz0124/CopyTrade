@@ -15,6 +15,7 @@ export interface FuturesContractDetail {
   minLeverage: number;
   maxLeverage: number;
   maintenanceMarginRate: number;
+  takerFeeRate: number;
 }
 
 export interface FuturesTicker {
