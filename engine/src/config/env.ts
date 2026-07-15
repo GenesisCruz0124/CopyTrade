@@ -18,6 +18,7 @@ const envSchema = z.object({
   MEXC_FUTURES_SECRET_KEY: z.string().default(""),
   MAX_FUTURES_LEVERAGE: z.coerce.number().positive().default(20),
   MIN_LIQUIDATION_DISTANCE_PCT: z.coerce.number().positive().default(15),
+  PAPER_FUTURES_BALANCE_USDT: z.coerce.number().positive().default(10000),
 
   // --- Discord signal channel + Claude vision extraction ---
   DISCORD_BOT_TOKEN: z.string().default(""),

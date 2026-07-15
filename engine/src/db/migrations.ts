@@ -110,6 +110,7 @@ export function runMigrations(db: Database.Database): void {
       close_reason TEXT,
       realized_pnl_usdt REAL,
       order_id TEXT,
+      mode TEXT NOT NULL DEFAULT 'live' CHECK (mode IN ('paper', 'live')),
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       closed_at INTEGER
@@ -128,6 +129,7 @@ export function runMigrations(db: Database.Database): void {
   migrateFuturesPositionsColumn(db, "taker_fee_rate");
   migrateFuturesPositionsColumn(db, "open_fee_usdt");
   migrateFuturesPositionsColumn(db, "close_fee_usdt");
+  migrateFuturesPositionsModeColumn(db);
 }
 
 /** All of these are plain nullable REAL columns added after futures_positions already
@@ -136,6 +138,20 @@ function migrateFuturesPositionsColumn(db: Database.Database, column: string): v
   const columns = db.prepare(`PRAGMA table_info(futures_positions)`).all() as { name: string }[];
   if (columns.some((c) => c.name === column)) return;
   db.exec(`ALTER TABLE futures_positions ADD COLUMN ${column} REAL`);
+}
+
+/**
+ * A pre-existing futures_positions table (created before paper-mode support
+ * for futures) has no mode column. SQLite can't ALTER TABLE ADD a CHECK'd
+ * column, so backfill everything as 'live' (the only mode that existed
+ * before this migration) without the constraint — new rows are still
+ * validated in application code (FuturesPositionManager only ever writes
+ * 'paper' or 'live').
+ */
+function migrateFuturesPositionsModeColumn(db: Database.Database): void {
+  const columns = db.prepare(`PRAGMA table_info(futures_positions)`).all() as { name: string }[];
+  if (columns.some((c) => c.name === "mode")) return;
+  db.exec(`ALTER TABLE futures_positions ADD COLUMN mode TEXT NOT NULL DEFAULT 'live'`);
 }
 
 /**

@@ -13,6 +13,8 @@ import { SafetyRails } from "./safety/safetyRails.js";
 import { BotManager, type FuturesDeps } from "./botManager.js";
 import { startServer } from "./api/server.js";
 import { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
+import { PaperFuturesClient } from "./mexcFutures/paperFuturesClient.js";
+import type { FuturesExchangeClient } from "./mexcFutures/futuresExchangeClient.js";
 import { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
 import { FuturesPositionManager } from "./mexcFutures/futuresPositionManager.js";
 import { DiscordSignalListener } from "./discord/discordSignalListener.js";
@@ -65,10 +67,21 @@ async function main() {
   let futures: FuturesDeps | undefined;
   let futuresPositions: FuturesPositionManager | undefined;
   if (isFuturesConfigured()) {
-    const futuresClient = new FuturesRestClient({
+    const realFuturesClient = new FuturesRestClient({
       accessKey: env.MEXC_FUTURES_ACCESS_KEY,
       secretKey: env.MEXC_FUTURES_SECRET_KEY
     });
+    let futuresClient: FuturesExchangeClient;
+    if (isLiveMode()) {
+      futuresClient = realFuturesClient;
+      logger.warn("TRADING_MODE=live — futures orders (including copy-trading) will be sent to MEXC for real");
+    } else {
+      futuresClient = new PaperFuturesClient(realFuturesClient, env.PAPER_FUTURES_BALANCE_USDT);
+      logger.info(
+        { seedBalanceUsdt: env.PAPER_FUTURES_BALANCE_USDT },
+        "futures trading in paper mode — no real futures orders will be sent to MEXC"
+      );
+    }
     const futuresTrading = new FuturesTradingService(futuresClient, safety);
     futures = { futuresClient, futuresTrading };
     futuresPositions = new FuturesPositionManager(db, futuresClient, safety, env.MAX_FUTURES_LEVERAGE);

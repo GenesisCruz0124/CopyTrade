@@ -1,6 +1,7 @@
 import { signFuturesRequest, sortedQueryString } from "./signer.js";
 import { RateLimitedQueue, withBackoffOn429 } from "../mexc/rateLimiter.js";
 import { logger } from "../logger.js";
+import type { FuturesExchangeClient } from "./futuresExchangeClient.js";
 import type {
   FuturesAsset,
   FuturesContractDetail,
@@ -32,7 +33,7 @@ export interface FuturesRestClientOptions {
  * signing scheme (ApiKey/Request-Time/Signature headers) — not compatible
  * with the Spot v3 client despite both being "MEXC".
  */
-export class FuturesRestClient {
+export class FuturesRestClient implements FuturesExchangeClient {
   private readonly accessKey: string;
   private readonly secretKey: string;
   private readonly baseUrl: string;

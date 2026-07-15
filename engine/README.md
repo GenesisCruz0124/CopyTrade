@@ -2,7 +2,7 @@
 
 24/7 Node.js + TypeScript trading bot engine for **MEXC Spot and Futures** (grid + DCA strategies), plus an optional Discord-signal copy-trading pipeline for futures. Talks to MEXC directly; the Android app talks only to this engine's REST API.
 
-**Paper mode is the default.** No real spot orders are sent to MEXC unless `TRADING_MODE=live` is set *and* the bot config has `confirmLive: true`. Futures orders (including copy-trading orders) are real the moment `MEXC_FUTURES_ACCESS_KEY`/`SECRET_KEY` are set — futures has no separate paper mode in this v1, so leave those blank until you're ready.
+**Paper mode is the default.** With `TRADING_MODE=paper` (the default), no real orders are sent to MEXC for spot bots, futures bots, manual futures positions, or copy-trading approvals — all of it fills against a simulated in-memory balance driven by real market data. Setting `TRADING_MODE=live` sends real spot orders (also requires `confirmLive: true` on the bot config) and real futures/copy-trading orders the moment `MEXC_FUTURES_ACCESS_KEY`/`SECRET_KEY` are set. Switching modes requires restarting the engine; paper and live positions are tracked separately so they never mix in balances or PnL history.
 
 ## Requirements
 
@@ -40,6 +40,7 @@
 | `MEXC_FUTURES_ACCESS_KEY` / `MEXC_FUTURES_SECRET_KEY` | for futures | — | Separate Futures API key pair; blank disables futures entirely |
 | `MAX_FUTURES_LEVERAGE` | no | `20` | Hard cap enforced by the safety rail, regardless of what a bot/signal requests |
 | `MIN_LIQUIDATION_DISTANCE_PCT` | no | `15` | Reject a futures order if its estimated liquidation price is closer than this % to entry |
+| `PAPER_FUTURES_BALANCE_USDT` | no | `10000` | Simulated USDT balance futures/copy-trading orders trade against when `TRADING_MODE=paper` |
 | `DISCORD_BOT_TOKEN` / `DISCORD_SIGNAL_CHANNEL_ID` | for copy trading | — | Bot token + the single channel ID to watch for signal images |
 | `ANTHROPIC_API_KEY` | for copy trading | — | Used to extract structured trade data from signal screenshots via Claude vision |
 | `SIGNAL_IMAGE_DIR` | no | `./data/copy-signal-images` | Where downloaded signal images are stored |
@@ -171,7 +172,7 @@ Run it under a process manager (systemd, pm2) so it restarts automatically. Orde
 
 - **MEXC Spot REST/WS clients** (`src/mexc/`) — signed requests, rate-limited queues (20 req/s order endpoints, 10 req/s others), 429 backoff, WS auto-reconnect with jitter before MEXC's 24h connection cap.
 - **MEXC Futures REST client** (`src/mexcFutures/`) — a separate signing scheme and REST surface (`contract.mexc.com`) from Spot; wrapped by `FuturesTradingService`, which enforces symbol rounding and the safety rail before every order.
-- **Paper exchange** (`src/paper/`) — simulates spot fills from live WS prices behind the same `ExchangeClient` interface the live client implements. Futures has no paper mode in this v1.
+- **Paper exchange** (`src/paper/`) — simulates spot fills from live WS prices behind the same `ExchangeClient` interface the live client implements. `PaperFuturesClient` (`src/mexcFutures/paperFuturesClient.ts`) is the futures counterpart — same idea, behind `FuturesExchangeClient`, used by `FuturesTradingService`, `FuturesPositionManager`, the futures strategies, and the copy-trading pipeline whenever `TRADING_MODE=paper`.
 - **Strategies** (`src/strategies/`) — spot grid/DCA and their futures counterparts (`futuresGridStrategy.ts`, `futuresDcaStrategy.ts` — leverage-aware, scoped down from the spot versions: futures re-entry after a fill relies on periodic reconciliation rather than a private WS fill stream).
 - **Safety rails** (`src/safety/`) — the single choke point every order passes through: budget cap, daily loss auto-pause, price-deviation/balance sanity checks, kill switch, plus futures-only leverage cap and estimated-liquidation-distance checks.
 - **Copy signals** (`src/discord/`, `src/vision/`, `src/copySignals/`) — Discord image listener → Claude vision extraction → pending-signal queue → human-approved futures order placement.

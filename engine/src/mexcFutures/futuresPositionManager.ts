@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import type { FuturesRestClient } from "./futuresRestClient.js";
+import type { FuturesExchangeClient } from "./futuresExchangeClient.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
 import { floorToStep } from "../mexc/symbolFilters.js";
+import { isLiveMode } from "../config/env.js";
 import { logger } from "../logger.js";
 
 export interface OpenPositionInput {
@@ -36,6 +37,7 @@ export interface FuturesPositionRow {
   close_reason: string | null;
   realized_pnl_usdt: number | null;
   order_id: string | null;
+  mode: "paper" | "live";
   created_at: number;
   updated_at: number;
   closed_at: number | null;
@@ -64,7 +66,7 @@ export interface FuturesPositionView extends FuturesPositionRow {
 export class FuturesPositionManager {
   constructor(
     private readonly db: Database.Database,
-    private readonly futuresClient: FuturesRestClient,
+    private readonly futuresClient: FuturesExchangeClient,
     private readonly safety: SafetyRails,
     private readonly maxLeverage: number = 20
   ) {}
@@ -179,6 +181,7 @@ export class FuturesPositionManager {
       close_reason: null,
       realized_pnl_usdt: null,
       order_id: result.orderId,
+      mode: isLiveMode() ? "live" : "paper",
       created_at: now,
       updated_at: now,
       closed_at: null
@@ -188,9 +191,9 @@ export class FuturesPositionManager {
       .prepare(
         `INSERT INTO futures_positions
            (id, symbol, side, leverage, open_type, entry_price, quantity, contract_size, margin_usdt,
-            take_profit_price, stop_loss_price, risk_usdt, taker_fee_rate, open_fee_usdt, status, order_id, created_at, updated_at)
+            take_profit_price, stop_loss_price, risk_usdt, taker_fee_rate, open_fee_usdt, status, order_id, mode, created_at, updated_at)
          VALUES (@id, @symbol, @side, @leverage, @open_type, @entry_price, @quantity, @contract_size, @margin_usdt,
-                 @take_profit_price, @stop_loss_price, @risk_usdt, @taker_fee_rate, @open_fee_usdt, @status, @order_id, @created_at, @updated_at)`
+                 @take_profit_price, @stop_loss_price, @risk_usdt, @taker_fee_rate, @open_fee_usdt, @status, @order_id, @mode, @created_at, @updated_at)`
       )
       .run(row);
 
@@ -242,17 +245,22 @@ export class FuturesPositionManager {
     };
   }
 
+  /** Current TRADING_MODE, so paper and live positions (same table) never mix in listings, PnL, or TP/SL monitoring. */
+  private currentMode(): "paper" | "live" {
+    return isLiveMode() ? "live" : "paper";
+  }
+
   async listOpen(): Promise<FuturesPositionView[]> {
     const rows = this.db
-      .prepare(`SELECT * FROM futures_positions WHERE status = 'open' ORDER BY created_at DESC`)
-      .all() as FuturesPositionRow[];
+      .prepare(`SELECT * FROM futures_positions WHERE status = 'open' AND mode = ? ORDER BY created_at DESC`)
+      .all(this.currentMode()) as FuturesPositionRow[];
     return this.attachLivePnl(rows);
   }
 
   listClosed(limit = 100): FuturesPositionView[] {
     const rows = this.db
-      .prepare(`SELECT * FROM futures_positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT ?`)
-      .all(limit) as FuturesPositionRow[];
+      .prepare(`SELECT * FROM futures_positions WHERE status = 'closed' AND mode = ? ORDER BY closed_at DESC LIMIT ?`)
+      .all(this.currentMode(), limit) as FuturesPositionRow[];
     return rows.map((row) => ({
       ...row,
       currentPrice: null,
@@ -291,9 +299,9 @@ export class FuturesPositionManager {
     const row = this.db
       .prepare(
         `SELECT COALESCE(SUM(realized_pnl_usdt), 0) as pnl, COALESCE(SUM(margin_usdt), 0) as margin, COUNT(*) as trades
-         FROM futures_positions WHERE status = 'closed' AND closed_at >= ?`
+         FROM futures_positions WHERE status = 'closed' AND mode = ? AND closed_at >= ?`
       )
-      .get(startOfDay.getTime()) as { pnl: number; margin: number; trades: number };
+      .get(this.currentMode(), startOfDay.getTime()) as { pnl: number; margin: number; trades: number };
     return {
       realizedPnlUsdt: row.pnl,
       realizedPnlPercent: row.margin > 0 ? (row.pnl / row.margin) * 100 : null,
@@ -303,7 +311,9 @@ export class FuturesPositionManager {
 
   /** Polls open positions and auto-closes any that crossed their TP/SL price. */
   async monitor(): Promise<void> {
-    const rows = this.db.prepare(`SELECT * FROM futures_positions WHERE status = 'open'`).all() as FuturesPositionRow[];
+    const rows = this.db
+      .prepare(`SELECT * FROM futures_positions WHERE status = 'open' AND mode = ?`)
+      .all(this.currentMode()) as FuturesPositionRow[];
     for (const row of rows) {
       if (row.take_profit_price == null && row.stop_loss_price == null) continue;
       try {
