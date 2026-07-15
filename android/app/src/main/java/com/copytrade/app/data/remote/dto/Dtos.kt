@@ -71,6 +71,28 @@ data class TradesResponseDto(
 )
 
 @Serializable
+data class OrderDto(
+    val id: String,
+    @kotlinx.serialization.SerialName("bot_id") val botId: String,
+    @kotlinx.serialization.SerialName("client_order_id") val clientOrderId: String,
+    @kotlinx.serialization.SerialName("exchange_order_id") val exchangeOrderId: String? = null,
+    val symbol: String,
+    val side: String,
+    val type: String,
+    val price: Double? = null,
+    val quantity: Double,
+    val status: String,
+    @kotlinx.serialization.SerialName("grid_level") val gridLevel: Int? = null,
+    @kotlinx.serialization.SerialName("created_at") val createdAt: Long
+)
+
+@Serializable
+data class OrdersResponseDto(
+    val mode: String,
+    val orders: List<OrderDto>
+)
+
+@Serializable
 data class PnlSnapshotDto(
     val id: Long,
     @kotlinx.serialization.SerialName("bot_id") val botId: String,

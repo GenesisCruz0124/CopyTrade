@@ -6,6 +6,7 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.BotEntity
 import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.local.entity.PnlSnapshotEntity
+import com.copytrade.app.data.remote.dto.OrderDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +19,7 @@ data class BotDetailUiState(
     val bot: BotEntity? = null,
     val fills: List<FillEntity> = emptyList(),
     val pnlSeries: List<PnlSnapshotEntity> = emptyList(),
+    val openOrders: List<OrderDto> = emptyList(),
     val error: String? = null
 )
 
@@ -31,8 +33,10 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
             val url = app.settingsRepository.serverUrl.first() ?: return@launch
             val repo = app.repositoryFor(url)
             combine(repo.observeBot(botId), repo.observeFillsForBot(botId), repo.observePnlForBot(botId)) { bot, fills, pnl ->
-                BotDetailUiState(bot = bot, fills = fills, pnlSeries = pnl)
-            }.catch { }.collect { _uiState.value = it }
+                Triple(bot, fills, pnl)
+            }.catch { }.collect { (bot, fills, pnl) ->
+                _uiState.value = _uiState.value.copy(bot = bot, fills = fills, pnlSeries = pnl)
+            }
         }
         refresh()
     }
@@ -45,6 +49,8 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
                 repo.refreshBots()
                 repo.refreshTrades(botId)
                 repo.refreshPnl(botId)
+                val orders = repo.getOpenOrders(botId)
+                _uiState.value = _uiState.value.copy(openOrders = orders)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message)
             }
@@ -71,6 +77,7 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 action(app.repositoryFor(url))
+                refresh()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message)
             }

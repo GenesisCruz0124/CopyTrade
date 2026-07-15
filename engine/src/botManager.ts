@@ -196,6 +196,18 @@ export class BotManager {
     }
   }
 
+  /** Polls every running grid/DCA bot for order fills. There is no push-based fill notification wired up yet. */
+  async reconcileAll(): Promise<void> {
+    for (const entry of this.bots.values()) {
+      if (entry.record.status !== "running") continue;
+      if ("reconcile" in entry.strategy) {
+        await (entry.strategy as { reconcile: () => Promise<void> }).reconcile().catch((err) => {
+          logger.error({ err, botId: entry.record.id }, "reconcile failed");
+        });
+      }
+    }
+  }
+
   pause(botId: string): void {
     const entry = this.requireBot(botId);
     if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
@@ -225,6 +237,12 @@ export class BotManager {
 
   getTrades(botId: string) {
     return this.db.prepare(`SELECT * FROM fills WHERE bot_id = ? ORDER BY created_at DESC LIMIT 500`).all(botId);
+  }
+
+  getOpenOrders(botId: string) {
+    return this.db
+      .prepare(`SELECT * FROM orders WHERE bot_id = ? AND status IN ('NEW', 'PARTIALLY_FILLED') ORDER BY created_at DESC`)
+      .all(botId);
   }
 
   getPnlSeries(botId: string) {

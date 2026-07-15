@@ -36,6 +36,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.FillEntity
+import com.copytrade.app.data.remote.dto.OrderDto
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -87,7 +88,15 @@ fun BotDetailScreen(botId: String, onBack: () -> Unit) {
             item { ControlsRow(viewModel) }
             item { PnlChartCard(state) }
             item {
-                Text(Strings.openOrders.resolve(), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "${Strings.openOrders.resolve()} (${state.openOrders.size})",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            if (state.openOrders.isEmpty()) {
+                item { Text(Strings.noOpenOrders.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                items(state.openOrders, key = { it.id }) { order -> OpenOrderRow(order) }
             }
             item {
                 Text(
@@ -158,6 +167,21 @@ private fun FillRow(fill: FillEntity) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(text = "${fill.side} ${fill.quantity}", style = MaterialTheme.typography.bodyMedium)
             Text(text = String.format(Locale.US, "@ %.4f", fill.price), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+    Divider()
+}
+
+@Composable
+private fun OpenOrderRow(order: OrderDto) {
+    val sideColor = if (order.side == "BUY") ProfitGreen else LossRed
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = "${order.side} ${order.quantity}", color = sideColor, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = order.price?.let { String.format(Locale.US, "@ %.4f", it) } ?: order.type,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
     Divider()
