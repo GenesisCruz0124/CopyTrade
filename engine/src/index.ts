@@ -17,6 +17,7 @@ import { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
 import { DiscordSignalListener } from "./discord/discordSignalListener.js";
 import { SignalExtractor } from "./vision/signalExtractor.js";
 import { CopySignalService } from "./copySignals/copySignalService.js";
+import { FxRateService } from "./fx/fxRateService.js";
 
 async function main() {
   const db = getDb();
@@ -124,13 +125,17 @@ async function main() {
     logger.info("copy trading not fully configured (needs futures + Discord + Anthropic) — copy-signal pipeline disabled");
   }
 
-  const app = await startServer({ db, exchange, safety, botManager, startedAt: Date.now(), copySignals });
+  const fxRates = new FxRateService();
+  fxRates.start();
+
+  const app = await startServer({ db, exchange, safety, botManager, startedAt: Date.now(), copySignals, fxRates });
 
   const shutdown = async () => {
     logger.info("shutting down");
     ws.close();
     pricePoller?.stop();
     clearInterval(reconcileTimer);
+    fxRates.stop();
     discordListener?.close();
     await app.close();
     process.exit(0);

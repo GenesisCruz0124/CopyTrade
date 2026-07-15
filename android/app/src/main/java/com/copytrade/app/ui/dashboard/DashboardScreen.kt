@@ -24,6 +24,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -150,17 +151,44 @@ fun DashboardScreen(
     }
 }
 
+/** Fixed-point, never scientific notation — Double.toString() switches to "1.7E-4" for small crypto quantities. */
+private fun formatQty(qty: Double): String = String.format(Locale.US, "%.8f", qty).trimEnd('0').trimEnd('.')
+
 @Composable
 private fun TotalBalanceCard(state: DashboardUiState) {
-    val totalUsdt = state.balances.sumOf { it.free + it.locked }
+    val nonZeroBalances = state.balances.filter { it.free + it.locked > 0 }
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = Strings.totalBalance.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
             Text(
-                text = String.format(Locale.US, "%.2f USDT", totalUsdt),
+                text = state.totalValueUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
                 style = MaterialTheme.typography.headlineMedium
             )
+            state.totalValuePhp?.let {
+                Text(
+                    text = String.format(Locale.US, "≈ ₱%.2f", it),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            if (nonZeroBalances.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Divider()
+                Spacer(Modifier.height(8.dp))
+                for (balance in nonZeroBalances) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = balance.asset, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = formatQty(balance.free + balance.locked), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
         }
     }
 }
