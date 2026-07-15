@@ -5,7 +5,11 @@ import type { MexcRestClient } from "./restClient.js";
 
 const WS_URL = "wss://wbs-api.mexc.com/ws";
 const MAX_CONNECTION_MS = 23 * 60 * 60 * 1000; // reconnect before MEXC's 24h cap
-const PING_INTERVAL_MS = 30_000;
+// MEXC (and some network paths) close an idle socket at ~30s of no client traffic.
+// Ping well under that margin, and send the first one immediately on connect rather
+// than waiting a full interval — waiting let the server close the socket before our
+// first keepalive ever went out, causing an endless connect/close/reconnect loop.
+const PING_INTERVAL_MS = 15_000;
 const LISTEN_KEY_KEEPALIVE_MS = 30 * 60 * 1000; // MEXC listen keys expire after 60 min
 
 export type BookTickerHandler = (ticker: BookTicker) => void;
@@ -92,8 +96,8 @@ export class MexcWsClient {
 
     this.ws.on("message", (data) => this.handleMessage(data.toString()));
 
-    this.ws.on("close", () => {
-      logger.warn("MEXC WS closed");
+    this.ws.on("close", (code, reason) => {
+      logger.warn({ code, reason: reason?.toString() }, "MEXC WS closed");
       this.clearTimers();
       if (!this.closedByUser) this.scheduleReconnect();
     });
@@ -140,6 +144,7 @@ export class MexcWsClient {
   }
 
   private armPing(): void {
+    this.send({ method: "PING" });
     this.pingTimer = setInterval(() => {
       this.send({ method: "PING" });
     }, PING_INTERVAL_MS);
