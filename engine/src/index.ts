@@ -5,6 +5,7 @@ import { logger } from "./logger.js";
 import { getDb } from "./db/index.js";
 import { MexcRestClient } from "./mexc/restClient.js";
 import { MexcWsClient } from "./mexc/wsClient.js";
+import { RestPricePoller } from "./mexc/restPricePoller.js";
 import { LiveExchangeClient } from "./exchange/LiveExchangeClient.js";
 import { PaperExchange } from "./paper/paperExchange.js";
 import type { ExchangeClient } from "./exchange/ExchangeClient.js";
@@ -44,8 +45,19 @@ async function main() {
   });
 
   const ws = new MexcWsClient({ restClient: isLiveMode() ? restClient : undefined });
+
+  let pricePoller: RestPricePoller | undefined;
   if (exchange instanceof PaperExchange) {
     ws.onBookTicker((ticker) => exchange.updatePrice(ticker.symbol, (ticker.bidPrice + ticker.askPrice) / 2));
+
+    // REST fallback: some MEXC WS market-data subscriptions get blocked for
+    // datacenter/VPS IPs even though REST stays reachable. Without this, paper
+    // bots on an affected host would never receive a price and silently never trade.
+    pricePoller = new RestPricePoller({
+      restClient,
+      onPrice: (symbol, price) => exchange.updatePrice(symbol, price)
+    });
+    pricePoller.start();
   }
 
   let futures: FuturesDeps | undefined;
@@ -61,7 +73,16 @@ async function main() {
     logger.info("MEXC_FUTURES_ACCESS_KEY/SECRET_KEY not set — futures bots disabled");
   }
 
-  const botManager = new BotManager(db, exchange, safety, (symbol) => ws.subscribeSymbol(symbol), futures);
+  const botManager = new BotManager(
+    db,
+    exchange,
+    safety,
+    (symbol) => {
+      ws.subscribeSymbol(symbol);
+      pricePoller?.addSymbol(symbol);
+    },
+    futures
+  );
 
   await ws.connect();
 
@@ -101,6 +122,7 @@ async function main() {
   const shutdown = async () => {
     logger.info("shutting down");
     ws.close();
+    pricePoller?.stop();
     discordListener?.close();
     await app.close();
     process.exit(0);
