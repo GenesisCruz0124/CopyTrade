@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CandlestickChart
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Notifications
@@ -63,6 +64,7 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenCopySignals: () -> Unit,
     onOpenSignals: () -> Unit,
+    onOpenActivity: () -> Unit,
     onOpenFutures: () -> Unit
 ) {
     val viewModel = appViewModel { DashboardViewModel(it) }
@@ -85,6 +87,9 @@ fun DashboardScreen(
                     }
                     IconButton(onClick = onOpenSignals) {
                         Icon(Icons.Filled.Insights, contentDescription = Strings.signalsTitle.resolve())
+                    }
+                    IconButton(onClick = onOpenActivity) {
+                        Icon(Icons.Filled.History, contentDescription = Strings.activityTitle.resolve())
                     }
                     IconButton(onClick = onOpenFutures) {
                         Icon(Icons.Filled.CandlestickChart, contentDescription = Strings.futuresTitle.resolve())

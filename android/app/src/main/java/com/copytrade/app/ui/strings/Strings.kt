@@ -150,6 +150,14 @@ object Strings {
         "Para sa impormasyon lamang. Hindi financial advice — mag-trade nang may sariling pananagutan."
     )
 
+    // Activity / alerts feed
+    val activityTitle = Bi("Activity", "Activity")
+    val activityEmpty = Bi(
+        "No activity yet. Signal alerts and bot events will show up here.",
+        "Wala pang activity. Dito lalabas ang signal alerts at bot events."
+    )
+    val activitySignalAlert = Bi("Signal alert", "Signal alert")
+
     // Futures trading
     val futuresTitle = Bi("Futures trading", "Futures trading")
     val futuresNotConfigured = Bi(
