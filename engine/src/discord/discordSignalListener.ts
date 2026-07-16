@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events, type Attachment } from "discord.js";
+import { Client, GatewayIntentBits, Events, type Attachment, type Message } from "discord.js";
 import { logger } from "../logger.js";
 
 export interface DiscordImageSignal {
@@ -32,12 +32,14 @@ export class DiscordSignalListener {
       if (message.channelId !== this.opts.channelId) return;
       if (message.author.bot) return;
 
-      const imageAttachments = [...message.attachments.values()].filter((a: Attachment) =>
-        (a.contentType ?? "").startsWith("image/")
-      );
+      const imageAttachments = this.collectImageAttachments(message);
 
-      for (const attachment of imageAttachments) {
-        this.handleAttachment(message.id, attachment).catch((err) =>
+      for (const [index, attachment] of imageAttachments.entries()) {
+        // A message can carry more than one image (multiple attachments, or a
+        // forwarded message combined with the forwarder's own attachment) —
+        // suffix the id so each gets its own signal/image file instead of colliding.
+        const channelMessageId = imageAttachments.length > 1 ? `${message.id}-${index}` : message.id;
+        this.handleAttachment(channelMessageId, attachment).catch((err) =>
           logger.error({ err, messageId: message.id }, "failed to process Discord signal image")
         );
       }
@@ -48,6 +50,20 @@ export class DiscordSignalListener {
     });
 
     await this.client.login(this.opts.botToken);
+  }
+
+  /**
+   * A manually-forwarded message (Discord's "Forward" action, as opposed to a
+   * reply or a Follow-Channel crosspost) carries its image inside
+   * message.messageSnapshots rather than message.attachments — the top-level
+   * message is just the forward wrapper and is usually attachment-less. Check
+   * both so screenshots relayed this way from a channel the bot can't join
+   * (no invite permission, not an announcement channel) still get picked up.
+   */
+  private collectImageAttachments(message: Message): Attachment[] {
+    const direct = [...message.attachments.values()];
+    const forwarded = [...message.messageSnapshots.values()].flatMap((snapshot) => [...snapshot.attachments.values()]);
+    return [...direct, ...forwarded].filter((a: Attachment) => (a.contentType ?? "").startsWith("image/"));
   }
 
   private async handleAttachment(messageId: string, attachment: Attachment): Promise<void> {
