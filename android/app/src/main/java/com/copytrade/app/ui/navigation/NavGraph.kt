@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.copytrade.app.notifications.SignalNotificationWatcher
+import com.copytrade.app.ui.activity.ActivityScreen
 import com.copytrade.app.ui.botdetail.BotDetailScreen
 import com.copytrade.app.ui.copysignals.CopySignalsScreen
 import com.copytrade.app.ui.createbot.CreateBotScreen
@@ -16,6 +17,7 @@ import com.copytrade.app.ui.futures.FuturesHistoryScreen
 import com.copytrade.app.ui.futures.FuturesScreen
 import com.copytrade.app.ui.settings.SettingsScreen
 import com.copytrade.app.ui.setup.SetupScreen
+import com.copytrade.app.ui.signals.SignalsScreen
 import com.copytrade.app.ui.tradelog.TradeLogScreen
 
 @Composable
@@ -39,11 +41,24 @@ fun CopyTradeNavGraph(startDestination: String) {
                 onOpenTradeLog = { navController.navigate(Screen.TradeLog.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onOpenCopySignals = { navController.navigate(Screen.CopySignals.route) },
+                onOpenSignals = { navController.navigate(Screen.Signals.route) },
+                onOpenActivity = { navController.navigate(Screen.Activity.route) },
                 onOpenFutures = { navController.navigate(Screen.Futures.route) }
             )
         }
+        composable(Screen.Activity.route) {
+            ActivityScreen(onBack = { navController.popBackStack() })
+        }
         composable(Screen.CopySignals.route) {
             CopySignalsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Screen.Signals.route) {
+            SignalsScreen(
+                onBack = { navController.popBackStack() },
+                // The signal's pair + side are persisted before this fires, so the
+                // Futures screen picks them up when it loads.
+                onTradeSignal = { navController.navigate(Screen.Futures.route) }
+            )
         }
         composable(Screen.Futures.route) {
             FuturesScreen(

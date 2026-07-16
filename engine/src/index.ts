@@ -24,6 +24,7 @@ import { DiscordSignalListener } from "./discord/discordSignalListener.js";
 import { SignalExtractor } from "./vision/signalExtractor.js";
 import { CopySignalService } from "./copySignals/copySignalService.js";
 import { FxRateService } from "./fx/fxRateService.js";
+import { SignalMonitor, parseSignalMonitorSymbols } from "./analysis/signalMonitor.js";
 
 async function main() {
   const db = getDb();
@@ -188,6 +189,26 @@ async function main() {
     logger.info("copy trading not fully configured (needs futures + Discord + Anthropic) — copy-signal pipeline disabled");
   }
 
+  // Background market-signal monitor: watches a configured pair list and records
+  // a `signal` event whenever a strong LONG/SHORT signal appears. Advisory only.
+  const signalMonitorSymbols = parseSignalMonitorSymbols(env.SIGNAL_MONITOR_SYMBOLS);
+  let signalMonitor: SignalMonitor | undefined;
+  if (signalMonitorSymbols.length > 0) {
+    signalMonitor = new SignalMonitor(db, (symbol, interval, limit) => exchange.getKlines(symbol, interval, limit), {
+      symbols: signalMonitorSymbols,
+      interval: env.SIGNAL_MONITOR_INTERVAL,
+      minConfidence: env.SIGNAL_MONITOR_MIN_CONFIDENCE,
+      pollSeconds: env.SIGNAL_MONITOR_POLL_SECONDS
+    });
+    signalMonitor.start();
+    logger.info(
+      { symbols: signalMonitorSymbols, interval: env.SIGNAL_MONITOR_INTERVAL },
+      "market-signal monitor started"
+    );
+  } else {
+    logger.info("SIGNAL_MONITOR_SYMBOLS not set — background signal monitor disabled");
+  }
+
   const fxRates = new FxRateService();
   fxRates.start();
 
@@ -211,6 +232,7 @@ async function main() {
     clearInterval(reconcileTimer);
     if (futuresMonitorTimer) clearInterval(futuresMonitorTimer);
     if (futuresPendingOrdersTimer) clearInterval(futuresPendingOrdersTimer);
+    signalMonitor?.stop();
     fxRates.stop();
     discordListener?.close();
     await app.close();

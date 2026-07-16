@@ -7,6 +7,7 @@ import { BotManager } from "../botManager.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
 import type { ExchangeClient } from "../exchange/ExchangeClient.js";
 import { botConfigSchema } from "../config/botConfigSchema.js";
+import { analyzeSignal, InsufficientCandlesError } from "../analysis/signalEngine.js";
 import type { CopySignalService } from "../copySignals/copySignalService.js";
 import type { FxRateService } from "../fx/fxRateService.js";
 import type { FuturesDeps } from "../botManager.js";
@@ -197,6 +198,37 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
         reply.send({ mode: modeOf(), symbol: req.params.symbol, klines });
       } catch (err) {
         reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      }
+    }
+  );
+
+  // Market-analysis signal: fetch candles for the pair and return a LONG/SHORT/
+  // NEUTRAL futures signal with confidence, indicator breakdown, and an
+  // ATR-based entry/stop-loss/take-profit bracket. Advisory only — it does not
+  // place any orders. Interval accepts MEXC kline intervals (e.g. 5m,15m,1h,4h).
+  const ALLOWED_INTERVALS = new Set(["1m", "5m", "15m", "30m", "1h", "4h", "1d"]);
+  app.get<{ Params: { symbol: string }; Querystring: { interval?: string } }>(
+    "/signals/:symbol",
+    async (req, reply) => {
+      const symbol = req.params.symbol.toUpperCase();
+      const interval = req.query.interval ?? "15m";
+      if (!ALLOWED_INTERVALS.has(interval)) {
+        reply.code(400).send({
+          mode: modeOf(),
+          error: `unsupported interval '${interval}'; allowed: ${[...ALLOWED_INTERVALS].join(", ")}`
+        });
+        return;
+      }
+      try {
+        const candles = await deps.exchange.getKlines(symbol, interval, 200);
+        const signal = analyzeSignal(symbol, interval, candles);
+        reply.send({ mode: modeOf(), signal });
+      } catch (err) {
+        if (err instanceof InsufficientCandlesError) {
+          reply.code(422).send({ mode: modeOf(), error: err.message });
+          return;
+        }
+        reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
       }
     }
   );

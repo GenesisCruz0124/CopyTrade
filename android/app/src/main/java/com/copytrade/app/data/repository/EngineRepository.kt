@@ -18,6 +18,7 @@ import com.copytrade.app.data.remote.dto.FuturesSymbolDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
+import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
@@ -84,6 +85,9 @@ class EngineRepository(
     suspend fun getOpenOrders(botId: String) = api.getOrders(botId).orders
 
     suspend fun getPrice(symbol: String) = api.getPrice(symbol).price
+
+    suspend fun getSignal(symbol: String, interval: String): SignalDto? =
+        api.getSignal(symbol, interval).signal
 
     suspend fun refreshPnl(botId: String) {
         val response = api.getPnl(botId)
