@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.CandlestickChart
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
@@ -28,6 +29,8 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -70,6 +73,7 @@ fun DashboardScreen(
     val viewModel = appViewModel { DashboardViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     var showKillSwitchConfirm by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     PollWhileForeground { viewModel.refresh() }
 
@@ -79,26 +83,43 @@ fun DashboardScreen(
                 title = { Text(Strings.dashboardTitle.resolve()) },
                 actions = {
                     ModeBadge(mode = state.mode, modifier = Modifier.padding(end = 8.dp))
-                    IconButton(onClick = onOpenTradeLog) {
-                        Icon(Icons.Filled.List, contentDescription = Strings.tradeLogTitle.resolve())
-                    }
-                    IconButton(onClick = onOpenCopySignals) {
-                        Icon(Icons.Filled.Notifications, contentDescription = Strings.copySignalsTitle.resolve())
-                    }
-                    IconButton(onClick = onOpenSignals) {
-                        Icon(Icons.Filled.Insights, contentDescription = Strings.signalsTitle.resolve())
-                    }
-                    IconButton(onClick = onOpenActivity) {
-                        Icon(Icons.Filled.History, contentDescription = Strings.activityTitle.resolve())
-                    }
-                    IconButton(onClick = onOpenFutures) {
-                        Icon(Icons.Filled.CandlestickChart, contentDescription = Strings.futuresTitle.resolve())
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = Strings.settingsTitle.resolve())
-                    }
                     IconButton(onClick = { showKillSwitchConfirm = true }) {
                         Icon(Icons.Filled.PowerSettingsNew, contentDescription = Strings.killSwitch.resolve(), tint = LossRed)
+                    }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(Strings.futuresTitle.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.CandlestickChart, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenFutures() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(Strings.tradeLogTitle.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.List, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenTradeLog() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(Strings.copySignalsTitle.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.Notifications, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenCopySignals() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(Strings.signalsTitle.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.Insights, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenSignals() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(Strings.activityTitle.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.History, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenActivity() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(Strings.settingsTitle.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenSettings() }
+                        )
                     }
                 }
             )
