@@ -5,24 +5,38 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import androidx.compose.runtime.Composable
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.MainActivity
 import com.copytrade.app.R
 import com.copytrade.app.data.remote.dto.CopySignalDto
-import com.copytrade.app.ui.appViewModel
-import com.copytrade.app.ui.components.PollWhileForeground
+import kotlinx.coroutines.flow.first
 import java.util.Locale
 
 const val COPY_SIGNALS_NOTIFICATION_CHANNEL_ID = "copy_signals"
 
-/** Polls for new PENDING copy signals every 10s, independent of the current screen, and raises a system notification for each one not yet seen. */
-@Composable
-fun SignalNotificationWatcher() {
-    val viewModel = appViewModel { SignalNotificationViewModel(it) }
-    PollWhileForeground { viewModel.pollForNewSignals() }
+/** Checks for new PENDING copy signals not yet seen and raises a system notification
+ *  for each one. Called on a loop by SignalPollingService, which keeps this running
+ *  even while the app is closed — a plain suspend function rather than a
+ *  ViewModel/Composable so the service can drive it directly. */
+suspend fun pollForNewSignals(app: CopyTradeApp) {
+    val settings = app.settingsRepository
+    if (!settings.isConfigured() || !settings.notificationsEnabled.first()) return
+
+    val url = settings.serverUrl.first() ?: return
+    val pending = try {
+        app.repositoryFor(url).getCopySignals("PENDING")
+    } catch (e: Exception) {
+        return
+    }
+
+    val notifiedIds = settings.notifiedSignalIds.first()
+    val newSignals = pending.filter { it.id !in notifiedIds }
+    newSignals.forEach { notifyNewSignal(app, it) }
+
+    settings.setNotifiedSignalIds(pending.map { it.id }.toSet())
 }
 
 private fun buildSignalNotification(context: Context, signal: CopySignalDto): android.app.Notification {

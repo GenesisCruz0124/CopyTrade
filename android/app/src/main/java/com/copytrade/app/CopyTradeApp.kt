@@ -9,6 +9,7 @@ import com.copytrade.app.data.remote.ApiService
 import com.copytrade.app.data.remote.buildApiService
 import com.copytrade.app.data.repository.EngineRepository
 import com.copytrade.app.notifications.COPY_SIGNALS_NOTIFICATION_CHANNEL_ID
+import com.copytrade.app.notifications.SIGNAL_POLLING_NOTIFICATION_CHANNEL_ID
 import com.copytrade.app.settings.SettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -32,16 +33,20 @@ class CopyTradeApp : Application() {
         super.onCreate()
         database = Room.databaseBuilder(this, AppDatabase::class.java, "copytrade.db").build()
         settingsRepository = SettingsRepository(this)
-        createCopySignalsNotificationChannel()
+        createNotificationChannels()
     }
 
-    private fun createCopySignalsNotificationChannel() {
-        val channel = NotificationChannel(
-            COPY_SIGNALS_NOTIFICATION_CHANNEL_ID,
-            "Copy Signals",
-            NotificationManager.IMPORTANCE_HIGH
+    private fun createNotificationChannels() {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(COPY_SIGNALS_NOTIFICATION_CHANNEL_ID, "Copy Signals", NotificationManager.IMPORTANCE_HIGH)
         )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        // LOW (not MIN) so it's visible in the shade explaining why CopyTrade is running,
+        // but silent and collapsible — this is just the foreground-service status notification,
+        // not an alert.
+        manager.createNotificationChannel(
+            NotificationChannel(SIGNAL_POLLING_NOTIFICATION_CHANNEL_ID, "Signal watcher status", NotificationManager.IMPORTANCE_LOW)
+        )
     }
 
     /** Rebuilds the Retrofit-backed repository if the server URL changed since the last call. */

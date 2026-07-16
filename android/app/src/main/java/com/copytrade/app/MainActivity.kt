@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.copytrade.app.notifications.SignalPollingService
 import com.copytrade.app.ui.navigation.CopyTradeNavGraph
 import com.copytrade.app.ui.navigation.Screen
 import com.copytrade.app.ui.strings.ProvideAppLanguage
@@ -41,6 +42,12 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(Unit) {
                 startDestination = if (app.settingsRepository.isConfigured()) Screen.Dashboard.route else Screen.Setup.route
+                // Restart on every launch in case the OS killed the service while the app was
+                // closed (Android may reclaim foreground services under memory pressure) —
+                // start() is a no-op if it's already running.
+                if (app.settingsRepository.isConfigured() && app.settingsRepository.notificationsEnabled.first()) {
+                    SignalPollingService.start(app)
+                }
                 app.settingsRepository.language.collect { language = it }
             }
 
