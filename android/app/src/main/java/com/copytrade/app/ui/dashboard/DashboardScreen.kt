@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material.ExperimentalMaterialApi
@@ -37,45 +38,56 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.copytrade.app.data.local.entity.BotEntity
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.ConfirmDialog
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
+import com.copytrade.app.ui.futures.ClosedPositionCard
+import com.copytrade.app.ui.futures.FuturesHistoryViewModel
+import com.copytrade.app.ui.futures.PendingOrderCard
+import com.copytrade.app.ui.futures.PositionCard
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
-import com.copytrade.app.ui.theme.ProfitGreen
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun DashboardScreen(
-    onOpenBot: (String) -> Unit,
     onCreateBot: () -> Unit,
     onOpenTradeLog: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCopySignals: () -> Unit,
     onOpenSignals: () -> Unit,
     onOpenActivity: () -> Unit,
-    onOpenFutures: () -> Unit
+    onOpenFutures: () -> Unit,
+    onOpenBots: () -> Unit
 ) {
     val viewModel = appViewModel { DashboardViewModel(it) }
     val state by viewModel.uiState.collectAsState()
+    val futuresViewModel = appViewModel { FuturesHistoryViewModel(it) }
+    val futuresState by futuresViewModel.uiState.collectAsState()
     var showKillSwitchConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var tabIndex by remember { mutableIntStateOf(0) }
 
-    PollWhileForeground { viewModel.refresh() }
+    PollWhileForeground {
+        viewModel.refresh()
+        futuresViewModel.refresh()
+    }
 
     Scaffold(
         topBar = {
@@ -90,6 +102,11 @@ fun DashboardScreen(
                         Icon(Icons.Filled.MoreVert, contentDescription = null)
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(Strings.activeBots.resolve()) },
+                            leadingIcon = { Icon(Icons.Filled.SmartToy, contentDescription = null) },
+                            onClick = { showMenu = false; onOpenBots() }
+                        )
                         DropdownMenuItem(
                             text = { Text(Strings.futuresTitle.resolve()) },
                             leadingIcon = { Icon(Icons.Filled.CandlestickChart, contentDescription = null) },
@@ -130,42 +147,73 @@ fun DashboardScreen(
             }
         }
     ) { padding ->
-        val pullRefreshState = rememberPullRefreshState(refreshing = state.isRefreshing, onRefresh = viewModel::refresh)
+        val pullRefreshState = rememberPullRefreshState(
+            refreshing = state.isRefreshing || futuresState.isLoading,
+            onRefresh = { viewModel.refresh(); futuresViewModel.refresh() }
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .pullRefresh(pullRefreshState)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item { TotalBalanceCard(state) }
-                item {
-                    Text(
-                        text = Strings.activeBots.resolve(),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+            Column(modifier = Modifier.fillMaxSize()) {
+                TotalBalanceCard(state, modifier = Modifier.padding(16.dp))
+
+                futuresState.error?.let {
+                    Text(it, color = LossRed, modifier = Modifier.padding(horizontal = 16.dp))
                 }
-                if (state.bots.isEmpty()) {
-                    item {
+
+                TabRow(selectedTabIndex = tabIndex) {
+                    Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text(Strings.openTab.resolve()) })
+                    Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(Strings.pendingTab.resolve()) })
+                    Tab(selected = tabIndex == 2, onClick = { tabIndex = 2 }, text = { Text(Strings.historyTab.resolve()) })
+                }
+
+                when (tabIndex) {
+                    0 -> if (futuresState.openPositions.isEmpty()) {
                         Text(
-                            text = Strings.noBotsYet.resolve(),
+                            Strings.noOpenPositions.resolve(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 16.dp)
+                            modifier = Modifier.padding(16.dp)
                         )
+                    } else {
+                        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(futuresState.openPositions, key = { it.id }) { position ->
+                                PositionCard(position = position, onClose = { futuresViewModel.closePosition(position.id) })
+                            }
+                        }
                     }
-                } else {
-                    items(state.bots, key = { it.id }) { bot ->
-                        BotCard(bot = bot, onClick = { onOpenBot(bot.id) })
+                    1 -> if (futuresState.pendingOrders.isEmpty()) {
+                        Text(
+                            Strings.noPendingOrders.resolve(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(futuresState.pendingOrders, key = { it.id }) { order ->
+                                PendingOrderCard(order = order, onCancel = { futuresViewModel.cancelOrder(order.id) })
+                            }
+                        }
+                    }
+                    else -> if (futuresState.closedPositions.isEmpty()) {
+                        Text(
+                            Strings.noPositionHistory.resolve(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(futuresState.closedPositions, key = { it.id }) { position ->
+                                ClosedPositionCard(position = position)
+                            }
+                        }
                     }
                 }
             }
             PullRefreshIndicator(
-                refreshing = state.isRefreshing,
+                refreshing = state.isRefreshing || futuresState.isLoading,
                 state = pullRefreshState,
                 modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter)
             )
@@ -191,9 +239,9 @@ fun DashboardScreen(
 private fun formatQty(qty: Double): String = String.format(Locale.US, "%.8f", qty).trimEnd('0').trimEnd('.')
 
 @Composable
-private fun TotalBalanceCard(state: DashboardUiState) {
+private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modifier) {
     val nonZeroBalances = state.balances.filter { it.free + it.locked > 0 }
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(modifier = modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = Strings.totalBalance.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
@@ -229,43 +277,3 @@ private fun TotalBalanceCard(state: DashboardUiState) {
     }
 }
 
-@Composable
-private fun BotCard(bot: BotEntity, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(Modifier),
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(text = "${bot.symbol} · ${bot.type.uppercase(Locale.US)}", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = statusLabel(bot.status),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
-                val pnlColor = if (bot.realizedPnlUsdt >= 0) ProfitGreen else LossRed
-                Text(
-                    text = String.format(Locale.US, "%+.2f USDT", bot.realizedPnlUsdt),
-                    color = pnlColor,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun statusLabel(status: String): String = when (status) {
-    "running" -> Strings.statusRunning.resolve()
-    "paused" -> Strings.statusPaused.resolve()
-    else -> Strings.statusStopped.resolve()
-}

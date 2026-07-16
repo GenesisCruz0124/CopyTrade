@@ -33,6 +33,14 @@ export interface CopyTradingConfig {
   marginMode: "isolated" | "cross";
 }
 
+export type PriceCheck = "valid" | "tp_hit" | "sl_hit" | "unknown";
+
+export interface CopySignalWithPriceCheck extends CopySignalRow {
+  current_price: number | null;
+  price_check: PriceCheck;
+  price_note: string | null;
+}
+
 /**
  * Turns a vision-extracted Discord signal into a PENDING row for the
  * Android app to review, then — once a human approves it — sizes and
@@ -67,7 +75,11 @@ export class CopySignalService {
       });
   }
 
-  createFromExtraction(params: { channelMessageId: string; imagePath: string; extraction: ExtractedSignal }): CopySignalRow {
+  createFromExtraction(params: {
+    channelMessageId: string;
+    imagePath: string | null;
+    extraction: ExtractedSignal;
+  }): CopySignalRow {
     const id = randomUUID();
     const now = Date.now();
     this.db
@@ -103,6 +115,55 @@ export class CopySignalService {
 
   get(id: string): CopySignalRow | undefined {
     return this.db.prepare(`SELECT * FROM copy_signals WHERE id = ?`).get(id) as CopySignalRow | undefined;
+  }
+
+  /**
+   * Same as list(), plus a live-price sanity check for each PENDING signal so the
+   * reviewer can see whether the call has already played out (hit TP) or already
+   * been invalidated (blown through SL) before they approve/reject it.
+   */
+  async listWithPriceCheck(status?: CopySignalRow["status"]): Promise<CopySignalWithPriceCheck[]> {
+    const rows = this.list(status);
+    const results: CopySignalWithPriceCheck[] = [];
+    for (const row of rows) {
+      if (row.status !== "PENDING" || !row.symbol || !row.side) {
+        results.push({ ...row, current_price: null, price_check: "unknown", price_note: null });
+        continue;
+      }
+      try {
+        const ticker = await this.futuresClient.ticker(row.symbol);
+        results.push({ ...row, current_price: ticker.fairPrice, ...this.evaluatePriceCheck(row, ticker.fairPrice) });
+      } catch (err) {
+        results.push({
+          ...row,
+          current_price: null,
+          price_check: "unknown",
+          price_note: `failed to fetch live price: ${err instanceof Error ? err.message : String(err)}`
+        });
+      }
+    }
+    return results;
+  }
+
+  private evaluatePriceCheck(row: CopySignalRow, price: number): { price_check: PriceCheck; price_note: string | null } {
+    const sl = row.stop_loss;
+    const tp = row.take_profit;
+    const slHit = row.side === "long" ? sl != null && price <= sl : sl != null && price >= sl;
+    const tpHit = row.side === "long" ? tp != null && price >= tp : tp != null && price <= tp;
+
+    if (slHit) {
+      return {
+        price_check: "sl_hit",
+        price_note: `price (${price}) has already reached the stop-loss/invalidation level (${sl}) — the signal may no longer be valid`
+      };
+    }
+    if (tpHit) {
+      return {
+        price_check: "tp_hit",
+        price_note: `price (${price}) has already reached the take-profit level (${tp}) — the move may already be played out`
+      };
+    }
+    return { price_check: "valid", price_note: null };
   }
 
   reject(id: string): CopySignalRow {

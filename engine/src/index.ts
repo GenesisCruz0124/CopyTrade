@@ -181,6 +181,10 @@ async function main() {
 
         const extraction = await extractor.extract(signal.imageBuffer, signal.contentType);
         copySignals!.createFromExtraction({ channelMessageId: signal.channelMessageId, imagePath, extraction });
+      },
+      onText: async (signal) => {
+        const extraction = await extractor.extractFromText(signal.text);
+        copySignals!.createFromExtraction({ channelMessageId: signal.channelMessageId, imagePath: null, extraction });
       }
     });
     await discordListener.connect();
