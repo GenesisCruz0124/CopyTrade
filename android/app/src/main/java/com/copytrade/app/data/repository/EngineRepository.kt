@@ -12,7 +12,6 @@ import com.copytrade.app.data.remote.ApiService
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
-import com.copytrade.app.data.remote.dto.FuturesBalanceDto
 import com.copytrade.app.data.remote.dto.FuturesPendingOrderDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolDto
@@ -112,7 +111,7 @@ class EngineRepository(
 
     suspend fun getFuturesSymbols(): List<FuturesSymbolDto> = api.getFuturesSymbols().symbols
 
-    suspend fun getFuturesBalance(): FuturesBalanceDto? = api.getFuturesBalance().balance
+    suspend fun getFuturesBalance() = api.getFuturesBalance()
 
     suspend fun getFuturesPositions(): List<FuturesPositionDto> = api.getFuturesPositions().positions
 

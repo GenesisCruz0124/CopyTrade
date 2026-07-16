@@ -37,13 +37,14 @@ class FuturesHistoryViewModel(private val app: CopyTradeApp) : ViewModel() {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val repo = app.repositoryFor(url)
-                val status = repo.getStatus()
                 val open = repo.getFuturesPositions()
                 val closed = repo.getFuturesPositionsHistory()
                 val pending = runCatching { repo.getFuturesOrders() }.getOrDefault(_uiState.value.pendingOrders)
+                // Futures has its own paper/live mode, independent of spot's — read it from
+                // a futures response (todayPnl already carries it), not repo.getStatus().
                 val todayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
                 _uiState.value = _uiState.value.copy(
-                    mode = status.mode,
+                    mode = todayPnl?.mode ?: _uiState.value.mode,
                     openPositions = open,
                     closedPositions = closed,
                     pendingOrders = pending,

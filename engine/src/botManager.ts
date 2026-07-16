@@ -9,7 +9,7 @@ import { FuturesGridStrategy } from "./strategies/grid/futuresGridStrategy.js";
 import { FuturesDcaStrategy } from "./strategies/dca/futuresDcaStrategy.js";
 import type { GridConfig, DcaConfig } from "./strategies/types.js";
 import { isLiveMode } from "./config/env.js";
-import type { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
+import type { FuturesExchangeClient } from "./mexcFutures/futuresExchangeClient.js";
 import type { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
 import { logger } from "./logger.js";
 
@@ -36,7 +36,7 @@ interface BotEntry {
 }
 
 export interface FuturesDeps {
-  futuresClient: FuturesRestClient;
+  futuresClient: FuturesExchangeClient;
   futuresTrading: FuturesTradingService;
 }
 

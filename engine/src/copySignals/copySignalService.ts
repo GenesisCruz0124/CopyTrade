@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { logger } from "../logger.js";
 import type { ExtractedSignal } from "../vision/signalExtractor.js";
 import type { FuturesTradingService } from "../mexcFutures/FuturesTradingService.js";
-import type { FuturesRestClient } from "../mexcFutures/futuresRestClient.js";
+import type { FuturesExchangeClient } from "../mexcFutures/futuresExchangeClient.js";
 
 export interface CopySignalRow {
   id: string;
@@ -41,7 +41,7 @@ export interface CopyTradingConfig {
 export class CopySignalService {
   constructor(
     private readonly db: Database.Database,
-    private readonly futuresClient: FuturesRestClient,
+    private readonly futuresClient: FuturesExchangeClient,
     private readonly futuresTrading: FuturesTradingService,
     private readonly config: CopyTradingConfig
   ) {

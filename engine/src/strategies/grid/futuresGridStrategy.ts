@@ -2,12 +2,12 @@ import type Database from "better-sqlite3";
 import type { GridConfig, GridLevelState } from "../types.js";
 import { computeGridLevels, computeBudgetPerBuyLevel, validateGridRangeAgainstPrice } from "./gridMath.js";
 import type { FuturesTradingService } from "../../mexcFutures/FuturesTradingService.js";
-import type { FuturesRestClient } from "../../mexcFutures/futuresRestClient.js";
+import type { FuturesExchangeClient } from "../../mexcFutures/futuresExchangeClient.js";
 import { logger } from "../../logger.js";
 
 export interface FuturesGridStrategyDeps {
   db: Database.Database;
-  futuresClient: FuturesRestClient;
+  futuresClient: FuturesExchangeClient;
   futuresTrading: FuturesTradingService;
 }
 
