@@ -76,12 +76,14 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val positionOpenedMessage = Strings.positionOpened.resolve()
+    val orderPlacedMessage = Strings.orderPlaced.resolve()
 
     PollWhileForeground { viewModel.refresh() }
 
     LaunchedEffect(state.opened) {
         if (state.opened) {
-            scope.launch { snackbarHostState.showSnackbar(positionOpenedMessage) }
+            val message = if (state.orderType == OrderTypeMode.LIMIT) orderPlacedMessage else positionOpenedMessage
+            scope.launch { snackbarHostState.showSnackbar(message) }
             viewModel.consumeOpened()
         }
     }
@@ -246,6 +248,29 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                 onClick = { viewModel.setSide("short") },
                 shape = SegmentedButtonDefaults.itemShape(1, 2)
             ) { Text(Strings.openShort.resolve(), color = if (state.side == "short") LossRed else MaterialTheme.colorScheme.onSurface) }
+        }
+
+        Text(Strings.orderTypeLabel.resolve(), style = MaterialTheme.typography.bodyMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = state.orderType == OrderTypeMode.MARKET,
+                onClick = { viewModel.setOrderType(OrderTypeMode.MARKET) },
+                shape = SegmentedButtonDefaults.itemShape(0, 2)
+            ) { Text(Strings.orderTypeMarket.resolve()) }
+            SegmentedButton(
+                selected = state.orderType == OrderTypeMode.LIMIT,
+                onClick = { viewModel.setOrderType(OrderTypeMode.LIMIT) },
+                shape = SegmentedButtonDefaults.itemShape(1, 2)
+            ) { Text(Strings.orderTypeLimit.resolve()) }
+        }
+        if (state.orderType == OrderTypeMode.LIMIT) {
+            OutlinedTextField(
+                value = state.limitPrice,
+                onValueChange = viewModel::setLimitPrice,
+                label = { Text(Strings.limitPriceLabel.resolve()) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         OutlinedTextField(

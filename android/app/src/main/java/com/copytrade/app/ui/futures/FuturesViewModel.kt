@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 enum class SizingMode { USD, PERCENT }
 enum class SlInputMode { PERCENT, PRICE }
 enum class TpInputMode { PERCENT, PRICE }
+enum class OrderTypeMode { MARKET, LIMIT }
 
 private fun SizingMode.toPrefValue() = if (this == SizingMode.USD) "usd" else "percent"
 private fun String.toSizingMode() = if (this == "percent") SizingMode.PERCENT else SizingMode.USD
@@ -40,6 +41,8 @@ data class FuturesUiState(
     val side: String = "long",
     val leverage: String = "5",
     val openType: String = "isolated",
+    val orderType: OrderTypeMode = OrderTypeMode.MARKET,
+    val limitPrice: String = "",
     val sizingMode: SizingMode = SizingMode.USD,
     val amountUsd: String = "",
     val percentOfBalance: String = "",
@@ -216,6 +219,14 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         viewModelScope.launch { app.settingsRepository.setFuturesOpenType(v) }
     }
 
+    fun setOrderType(mode: OrderTypeMode) {
+        _uiState.value = _uiState.value.copy(orderType = mode)
+    }
+
+    fun setLimitPrice(v: String) {
+        _uiState.value = _uiState.value.copy(limitPrice = v)
+    }
+
     fun setSizingMode(mode: SizingMode) {
         _uiState.value = _uiState.value.copy(sizingMode = mode)
         viewModelScope.launch { app.settingsRepository.setFuturesSizingMode(mode.toPrefValue()) }
@@ -384,11 +395,21 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
             return
         }
 
-        // Validate TP/SL against the live price before ever hitting the network — a stale or
+        var limitPriceValue: Double? = null
+        if (state.orderType == OrderTypeMode.LIMIT) {
+            limitPriceValue = state.limitPrice.toDoubleOrNull()
+            if (limitPriceValue == null || limitPriceValue <= 0) {
+                _uiState.value = state.copy(error = "Enter a valid limit price")
+                return
+            }
+        }
+
+        // Validate TP/SL against a reference price before ever hitting the network — a stale or
         // absent price, or a percentage that would flip TP/SL to the wrong side, must block
-        // submission instead of letting the engine reject it after the fact.
-        val currentPrice = state.currentPrice
-        if (currentPrice == null) {
+        // submission instead of letting the engine reject it after the fact. For a LIMIT order the
+        // real entry is the limit price, not the current market price, so that's the reference used.
+        val referencePrice = if (state.orderType == OrderTypeMode.LIMIT) limitPriceValue else state.currentPrice
+        if (referencePrice == null) {
             _uiState.value = state.copy(error = "Still loading the current price — try again in a moment")
             return
         }
@@ -402,8 +423,8 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
             _uiState.value = state.copy(error = "Stop-loss must be a positive percentage below 100")
             return
         }
-        val tpPrice = tpPercent?.let { if (state.side == "long") currentPrice * (1 + it / 100) else currentPrice * (1 - it / 100) }
-        val slPrice = slPercent?.let { if (state.side == "long") currentPrice * (1 - it / 100) else currentPrice * (1 + it / 100) }
+        val tpPrice = tpPercent?.let { if (state.side == "long") referencePrice * (1 + it / 100) else referencePrice * (1 - it / 100) }
+        val slPrice = slPercent?.let { if (state.side == "long") referencePrice * (1 - it / 100) else referencePrice * (1 + it / 100) }
         if (tpPrice != null && tpPrice <= 0) {
             _uiState.value = state.copy(error = "Take-profit is invalid at the current price")
             return
@@ -414,8 +435,8 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
         }
         val tpSlValid = when {
             tpPrice == null && slPrice == null -> true
-            state.side == "long" -> (slPrice == null || slPrice < currentPrice) && (tpPrice == null || tpPrice > currentPrice)
-            else -> (slPrice == null || slPrice > currentPrice) && (tpPrice == null || tpPrice < currentPrice)
+            state.side == "long" -> (slPrice == null || slPrice < referencePrice) && (tpPrice == null || tpPrice > referencePrice)
+            else -> (slPrice == null || slPrice > referencePrice) && (tpPrice == null || tpPrice < referencePrice)
         }
         if (!tpSlValid) {
             _uiState.value = state.copy(error = "Take-profit / stop-loss must be on the correct side of the current price")
@@ -435,7 +456,9 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                     percentOfBalance = if (state.sizingMode == SizingMode.PERCENT) percent else null,
                     takeProfitPercent = tpPercent,
                     stopLossPercent = slPercent,
-                    confirmLive = state.confirmLive
+                    confirmLive = state.confirmLive,
+                    orderType = if (state.orderType == OrderTypeMode.LIMIT) "LIMIT" else "MARKET",
+                    limitPrice = limitPriceValue
                 )
                 app.repositoryFor(url).openFuturesPosition(request)
                 _uiState.value = _uiState.value.copy(isSubmitting = false, opened = true)

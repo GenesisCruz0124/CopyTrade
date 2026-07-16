@@ -8,6 +8,8 @@ import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.EventsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesBalanceResponseDto
+import com.copytrade.app.data.remote.dto.FuturesOrdersResponseDto
+import com.copytrade.app.data.remote.dto.FuturesPendingOrderResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPositionResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPositionsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesPriceDto
@@ -116,4 +118,13 @@ interface ApiService {
         @Path("symbol") symbol: String,
         @Query("limit") limit: Int = 100
     ): KlinesResponseDto
+
+    @GET("futures/orders")
+    suspend fun getFuturesOrders(): FuturesOrdersResponseDto
+
+    @GET("futures/orders/history")
+    suspend fun getFuturesOrdersHistory(@Query("limit") limit: Int = 100): FuturesOrdersResponseDto
+
+    @POST("futures/orders/{id}/cancel")
+    suspend fun cancelFuturesOrder(@Path("id") id: String): FuturesPendingOrderResponseDto
 }

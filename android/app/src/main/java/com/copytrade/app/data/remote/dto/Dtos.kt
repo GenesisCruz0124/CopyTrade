@@ -281,6 +281,7 @@ data class KlinesResponseDto(
 data class FuturesPositionResponseDto(
     val mode: String,
     val position: FuturesPositionDto? = null,
+    val pendingOrder: FuturesPendingOrderDto? = null,
     val error: String? = null
 )
 
@@ -294,7 +295,45 @@ data class OpenFuturesPositionRequest(
     val percentOfBalance: Double? = null,
     val takeProfitPercent: Double? = null,
     val stopLossPercent: Double? = null,
-    val confirmLive: Boolean = false
+    val confirmLive: Boolean = false,
+    val orderType: String = "MARKET",
+    val limitPrice: Double? = null
+)
+
+@Serializable
+data class FuturesPendingOrderDto(
+    val id: String,
+    val symbol: String,
+    val side: String,
+    val leverage: Double,
+    @kotlinx.serialization.SerialName("open_type") val openType: String,
+    @kotlinx.serialization.SerialName("limit_price") val limitPrice: Double,
+    val quantity: Double,
+    @kotlinx.serialization.SerialName("margin_usdt") val marginUsdt: Double,
+    @kotlinx.serialization.SerialName("take_profit_percent") val takeProfitPercent: Double? = null,
+    @kotlinx.serialization.SerialName("stop_loss_percent") val stopLossPercent: Double? = null,
+    @kotlinx.serialization.SerialName("risk_usdt") val riskUsdt: Double? = null,
+    val status: String,
+    @kotlinx.serialization.SerialName("filled_quantity") val filledQuantity: Double = 0.0,
+    @kotlinx.serialization.SerialName("filled_price") val filledPrice: Double? = null,
+    @kotlinx.serialization.SerialName("filled_at") val filledAt: Long? = null,
+    @kotlinx.serialization.SerialName("cancel_reason") val cancelReason: String? = null,
+    @kotlinx.serialization.SerialName("last_check_error") val lastCheckError: String? = null,
+    @kotlinx.serialization.SerialName("created_at") val createdAt: Long,
+    @kotlinx.serialization.SerialName("updated_at") val updatedAt: Long
+)
+
+@Serializable
+data class FuturesOrdersResponseDto(
+    val mode: String,
+    val orders: List<FuturesPendingOrderDto> = emptyList()
+)
+
+@Serializable
+data class FuturesPendingOrderResponseDto(
+    val mode: String,
+    val order: FuturesPendingOrderDto? = null,
+    val error: String? = null
 )
 
 @Serializable
