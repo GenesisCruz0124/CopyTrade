@@ -28,6 +28,22 @@ Respond with ONLY a JSON object, no prose, matching exactly this shape:
 
 If the image is not a trading signal at all, set all trade fields to null, confidence to 0, and explain in notes.`;
 
+const TEXT_EXTRACTION_PROMPT = `You are reading a trading signal posted as a plain-text Discord message (e.g. "Market short zec sl 559.35" or "MARKET SHORT $MET"). Extract the trade the poster is calling.
+
+Respond with ONLY a JSON object, no prose, matching exactly this shape:
+{
+  "symbol": string | null,       // trading pair in the form "BTC_USDT" (base_quote, uppercase). Null if unreadable.
+  "side": "long" | "short" | null,
+  "leverage": number | null,     // as a plain multiplier, e.g. 10 for "10x". Null if not mentioned.
+  "entryPrice": number | null,   // null for a "market" call with no explicit entry level
+  "stopLoss": number | null,
+  "takeProfit": number | null,   // if multiple TP levels are given, use the first/nearest one
+  "confidence": number,          // 0.0-1.0: how confident you are this extraction is correct and complete
+  "notes": string                // brief note on anything ambiguous or why confidence is low
+}
+
+If the message is not actually a trading signal, set all trade fields to null, confidence to 0, and explain in notes.`;
+
 export interface SignalExtractorOptions {
   apiKey: string;
   model?: string;
@@ -62,7 +78,22 @@ export class SignalExtractor {
 
     const textBlock = response.content.find((b) => b.type === "text");
     const raw = textBlock && textBlock.type === "text" ? textBlock.text : "";
+    return this.parseExtractionResponse(raw);
+  }
 
+  async extractFromText(text: string): Promise<ExtractedSignal> {
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: 512,
+      messages: [{ role: "user", content: `${TEXT_EXTRACTION_PROMPT}\n\nMessage:\n${text}` }]
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    const raw = textBlock && textBlock.type === "text" ? textBlock.text : "";
+    return this.parseExtractionResponse(raw);
+  }
+
+  private parseExtractionResponse(raw: string): ExtractedSignal {
     try {
       const parsed = this.parseJson(raw);
       return {

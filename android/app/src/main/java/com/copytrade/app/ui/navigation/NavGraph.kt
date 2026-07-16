@@ -9,6 +9,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.copytrade.app.ui.activity.ActivityScreen
 import com.copytrade.app.ui.botdetail.BotDetailScreen
+import com.copytrade.app.ui.bots.BotsScreen
 import com.copytrade.app.ui.copysignals.CopySignalsScreen
 import com.copytrade.app.ui.createbot.CreateBotScreen
 import com.copytrade.app.ui.dashboard.DashboardScreen
@@ -33,14 +34,20 @@ fun CopyTradeNavGraph(startDestination: String) {
         }
         composable(Screen.Dashboard.route) {
             DashboardScreen(
-                onOpenBot = { botId -> navController.navigate(Screen.BotDetail.route(botId)) },
                 onCreateBot = { navController.navigate(Screen.CreateBot.route) },
                 onOpenTradeLog = { navController.navigate(Screen.TradeLog.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onOpenCopySignals = { navController.navigate(Screen.CopySignals.route) },
                 onOpenSignals = { navController.navigate(Screen.Signals.route) },
                 onOpenActivity = { navController.navigate(Screen.Activity.route) },
-                onOpenFutures = { navController.navigate(Screen.Futures.route) }
+                onOpenFutures = { navController.navigate(Screen.Futures.route) },
+                onOpenBots = { navController.navigate(Screen.Bots.route) }
+            )
+        }
+        composable(Screen.Bots.route) {
+            BotsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenBot = { botId -> navController.navigate(Screen.BotDetail.route(botId)) }
             )
         }
         composable(Screen.Activity.route) {

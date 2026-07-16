@@ -100,16 +100,18 @@ private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: 
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            AsyncImage(
-                model = ImageRequest.Builder(app).data(imageUrl).crossfade(true).build(),
-                imageLoader = imageLoader,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .padding(bottom = 12.dp)
-            )
+            if (signal.imagePath != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(app).data(imageUrl).crossfade(true).build(),
+                    imageLoader = imageLoader,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .padding(bottom = 12.dp)
+                )
+            }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(text = signal.symbol ?: "?", style = MaterialTheme.typography.titleMedium)
@@ -121,11 +123,27 @@ private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: 
             signal.entryPrice?.let { Text("Entry: $it", style = MaterialTheme.typography.bodyMedium) }
             signal.stopLoss?.let { Text("SL: $it", style = MaterialTheme.typography.bodyMedium) }
             signal.takeProfit?.let { Text("TP: $it", style = MaterialTheme.typography.bodyMedium) }
+            signal.currentPrice?.let { Text("Current: $it", style = MaterialTheme.typography.bodyMedium) }
             signal.confidence?.let {
                 Text(
                     text = "${Strings.signalConfidence.resolve()}: ${(it * 100).toInt()}%",
                     color = if (it < 0.6) PaperOrange else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            if (signal.priceCheck == "tp_hit" || signal.priceCheck == "sl_hit") {
+                Text(
+                    text = signal.priceNote ?: "",
+                    color = LossRed,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            } else if (signal.priceCheck == "valid") {
+                Text(
+                    text = "Price still valid vs SL/TP",
+                    color = ProfitGreen,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
 

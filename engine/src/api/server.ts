@@ -438,7 +438,7 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
       return;
     }
     const status = req.query.status as any;
-    reply.send({ mode: modeOf(), signals: deps.copySignals.list(status) });
+    reply.send({ mode: modeOf(), signals: await deps.copySignals.listWithPriceCheck(status) });
   });
 
   app.get<{ Params: { id: string } }>("/copy-signals/:id/image", async (req, reply) => {

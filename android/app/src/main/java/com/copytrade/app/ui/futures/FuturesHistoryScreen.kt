@@ -158,7 +158,7 @@ private fun TodayPnlCard(pnl: FuturesTodayPnlDto, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit) {
+internal fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit) {
     val sideColor = if (order.side == "long") ProfitGreen else LossRed
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -204,16 +204,16 @@ private fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit
     }
 }
 
-private fun closeReasonLabel(reason: String?): Bi = when (reason) {
+internal fun closeReasonLabel(reason: String?): Bi = when (reason) {
     "take_profit" -> Strings.closeReasonTakeProfit
     "stop_loss" -> Strings.closeReasonStopLoss
     else -> Strings.closeReasonManual
 }
 
-private val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.US)
+internal val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.US)
 
 @Composable
-private fun ClosedPositionCard(position: FuturesPositionDto) {
+internal fun ClosedPositionCard(position: FuturesPositionDto) {
     val pnl = position.realizedPnlUsdt
     val pnlColor = when {
         pnl == null -> MaterialTheme.colorScheme.onSurfaceVariant

@@ -95,4 +95,76 @@ describe("CopySignalService.approve", () => {
     expect(placedOrders).toHaveLength(0);
     expect(service.get(signal.id)!.status).toBe("FAILED");
   });
+
+  it("accepts a null imagePath for text-only signals", async () => {
+    const signal = service.createFromExtraction({
+      channelMessageId: "msg-text",
+      imagePath: null,
+      extraction: baseExtraction()
+    });
+    expect(signal.image_path).toBeNull();
+  });
+});
+
+describe("CopySignalService.listWithPriceCheck", () => {
+  let db: Database.Database;
+  let service: CopySignalService;
+  let tickerPrice: number;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    runMigrations(db);
+    tickerPrice = 0.5995;
+
+    const fakeFuturesTrading = {} as unknown as FuturesTradingService;
+    const fakeFuturesClient = {
+      ticker: async (symbol: string): Promise<FuturesTicker> => ({ symbol, lastPrice: tickerPrice, fairPrice: tickerPrice })
+    } as unknown as FuturesExchangeClient;
+
+    service = new CopySignalService(db, fakeFuturesClient, fakeFuturesTrading, {
+      botId: "copy-trading",
+      budgetUsdt: 1000,
+      riskPctPerTrade: 2,
+      defaultLeverage: 3,
+      marginMode: "isolated"
+    });
+  });
+
+  it("flags a long signal as sl_hit once price has fallen to/below the stop-loss", async () => {
+    service.createFromExtraction({
+      channelMessageId: "msg-sl",
+      imagePath: null,
+      extraction: baseExtraction({ side: "long", stopLoss: 0.6, takeProfit: 1.0 })
+    });
+    tickerPrice = 0.55; // below stopLoss
+
+    const [signal] = await service.listWithPriceCheck("PENDING");
+    expect(signal.price_check).toBe("sl_hit");
+    expect(signal.current_price).toBe(0.55);
+  });
+
+  it("flags a long signal as tp_hit once price has risen to/above the take-profit", async () => {
+    service.createFromExtraction({
+      channelMessageId: "msg-tp",
+      imagePath: null,
+      extraction: baseExtraction({ side: "long", stopLoss: 0.4, takeProfit: 0.7 })
+    });
+    tickerPrice = 0.75; // above takeProfit
+
+    const [signal] = await service.listWithPriceCheck("PENDING");
+    expect(signal.price_check).toBe("tp_hit");
+  });
+
+  it("reports valid when price sits between stop-loss and take-profit", async () => {
+    service.createFromExtraction({
+      channelMessageId: "msg-valid",
+      imagePath: null,
+      extraction: baseExtraction({ side: "long", stopLoss: 0.4, takeProfit: 1.0 })
+    });
+    tickerPrice = 0.6;
+
+    const [signal] = await service.listWithPriceCheck("PENDING");
+    expect(signal.price_check).toBe("valid");
+    expect(signal.price_note).toBeNull();
+  });
 });
