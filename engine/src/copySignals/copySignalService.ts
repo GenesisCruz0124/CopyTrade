@@ -115,9 +115,9 @@ export class CopySignalService {
   async approve(id: string): Promise<CopySignalRow> {
     const row = this.requireRow(id);
     if (row.status !== "PENDING") throw new Error(`copy signal ${id} is not pending (status=${row.status})`);
-    if (!row.symbol || !row.side || !row.entry_price) {
-      this.updateStatus(id, "FAILED", "missing required fields (symbol/side/entryPrice) after extraction");
-      throw new Error("cannot approve a signal missing symbol, side, or entry price");
+    if (!row.symbol || !row.side) {
+      this.updateStatus(id, "FAILED", "missing required fields (symbol/side) after extraction");
+      throw new Error("cannot approve a signal missing symbol or side");
     }
 
     this.updateStatus(id, "APPROVED");
@@ -125,9 +125,16 @@ export class CopySignalService {
     const leverage = row.leverage ?? this.config.defaultLeverage;
     const marginUsdt = this.config.budgetUsdt * (this.config.riskPctPerTrade / 100);
     const notional = marginUsdt * leverage;
-    const quantity = notional / row.entry_price;
 
     try {
+      // A signal with no explicit entry price (e.g. "MARKET LONG $JTO" — a market
+      // call, not a level to wait for) can't size against a null price or freeze a
+      // stale one into a LIMIT order — size against the current live price instead
+      // and place a market order, matching what the signal actually called for.
+      const orderType: "LIMIT" | "MARKET" = row.entry_price != null ? "LIMIT" : "MARKET";
+      const entryPrice = row.entry_price ?? (await this.futuresClient.ticker(row.symbol)).fairPrice;
+      const quantity = notional / entryPrice;
+
       const result = await this.futuresTrading.placeOrder({
         botId: this.config.botId,
         symbol: row.symbol,
@@ -136,8 +143,8 @@ export class CopySignalService {
         leverage,
         openType: this.config.marginMode,
         quantity,
-        price: row.entry_price,
-        type: "LIMIT"
+        price: orderType === "LIMIT" ? entryPrice : undefined,
+        type: orderType
       });
       this.db
         .prepare(`UPDATE copy_signals SET status = 'EXECUTED', order_id = ?, updated_at = ? WHERE id = ?`)

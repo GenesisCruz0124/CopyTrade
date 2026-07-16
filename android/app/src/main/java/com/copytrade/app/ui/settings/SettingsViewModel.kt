@@ -3,6 +3,7 @@ package com.copytrade.app.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
+import com.copytrade.app.notifications.SignalPollingService
 import com.copytrade.app.ui.strings.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,7 @@ class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
         viewModelScope.launch {
             app.settingsRepository.setNotificationsEnabled(enabled)
             _uiState.value = _uiState.value.copy(notificationsEnabled = enabled)
+            if (enabled) SignalPollingService.start(app) else SignalPollingService.stop(app)
         }
     }
 
@@ -52,6 +54,7 @@ class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
 
     fun disconnect(onDisconnected: () -> Unit) {
         app.settingsRepository.clearAuthToken()
+        SignalPollingService.stop(app)
         onDisconnected()
     }
 }

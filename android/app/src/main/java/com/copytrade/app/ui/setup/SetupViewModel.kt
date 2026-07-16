@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.buildApiService
+import com.copytrade.app.notifications.SignalPollingService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 sealed interface ConnectionTestState {
@@ -54,6 +56,9 @@ class SetupViewModel(private val app: CopyTradeApp) : ViewModel() {
         viewModelScope.launch {
             app.settingsRepository.setServerUrl(serverUrl.value.trim())
             app.settingsRepository.setAuthToken(token.value.trim())
+            if (app.settingsRepository.notificationsEnabled.first()) {
+                SignalPollingService.start(app)
+            }
             onDone()
         }
     }
