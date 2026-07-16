@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { readFile } from "node:fs/promises";
 import type Database from "better-sqlite3";
-import { env, isLiveMode } from "../config/env.js";
+import { env, isLiveMode, isFuturesLiveMode } from "../config/env.js";
 import { logger } from "../logger.js";
 import { BotManager } from "../botManager.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
@@ -77,6 +77,13 @@ async function computeTotalValueUsdt(
 
 function modeOf(): "paper" | "live" {
   return isLiveMode() ? "live" : "paper";
+}
+
+/** Futures mode is independent of spot's modeOf() — using modeOf() for futures
+ *  responses previously mislabeled every real futures trade as "paper" whenever
+ *  spot happened to be in paper mode (found live during testing 2026-07-16). */
+function futuresModeOf(): "paper" | "live" {
+  return isFuturesLiveMode() ? "live" : "paper";
 }
 
 export function buildServer(deps: ApiServerDeps): FastifyInstance {
@@ -204,40 +211,40 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
 
   app.get("/futures/symbols", async (_req, reply) => {
     if (!deps.futures) {
-      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
       return;
     }
     try {
       const symbols = await deps.futures.futuresClient.allContracts();
-      reply.send({ mode: modeOf(), symbols });
+      reply.send({ mode: futuresModeOf(), symbols });
     } catch (err) {
-      reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      reply.code(502).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
 
   app.get("/futures/balance", async (_req, reply) => {
     if (!deps.futures) {
-      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
       return;
     }
     try {
       const asset = await deps.futures.futuresClient.assets("USDT");
-      reply.send({ mode: modeOf(), balance: asset });
+      reply.send({ mode: futuresModeOf(), balance: asset });
     } catch (err) {
-      reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      reply.code(502).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
 
   app.get<{ Params: { symbol: string } }>("/futures/price/:symbol", async (req, reply) => {
     if (!deps.futures) {
-      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
       return;
     }
     try {
       const ticker = await deps.futures.futuresClient.ticker(req.params.symbol);
-      reply.send({ mode: modeOf(), symbol: ticker.symbol, price: ticker.fairPrice });
+      reply.send({ mode: futuresModeOf(), symbol: ticker.symbol, price: ticker.fairPrice });
     } catch (err) {
-      reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      reply.code(502).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
 
@@ -245,58 +252,61 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     "/futures/klines/:symbol",
     async (req, reply) => {
       if (!deps.futures) {
-        reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+        reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
         return;
       }
       try {
         const limit = req.query.limit ? Number(req.query.limit) : 100;
         const klines = await deps.futures.futuresClient.klines(req.params.symbol, "Min15", limit);
-        reply.send({ mode: modeOf(), symbol: req.params.symbol, klines });
+        reply.send({ mode: futuresModeOf(), symbol: req.params.symbol, klines });
       } catch (err) {
-        reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+        reply.code(502).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
       }
     }
   );
 
   app.get("/futures/positions", async (_req, reply) => {
     if (!deps.futuresPositions) {
-      reply.send({ mode: modeOf(), positions: [] });
+      reply.send({ mode: futuresModeOf(), positions: [] });
       return;
     }
     const positions = await deps.futuresPositions.listOpen();
-    reply.send({ mode: modeOf(), positions });
+    reply.send({ mode: futuresModeOf(), positions });
   });
 
   app.get<{ Querystring: { limit?: string } }>("/futures/positions/history", async (req, reply) => {
     if (!deps.futuresPositions) {
-      reply.send({ mode: modeOf(), positions: [] });
+      reply.send({ mode: futuresModeOf(), positions: [] });
       return;
     }
     const limit = req.query.limit ? Number(req.query.limit) : 100;
     const positions = deps.futuresPositions.listClosed(limit);
-    reply.send({ mode: modeOf(), positions });
+    reply.send({ mode: futuresModeOf(), positions });
   });
 
   app.get("/futures/pnl/today", async (_req, reply) => {
     if (!deps.futuresPositions) {
-      reply.send({ mode: modeOf(), realizedPnlUsdt: 0, realizedPnlPercent: null, tradesCount: 0 });
+      reply.send({ mode: futuresModeOf(), realizedPnlUsdt: 0, realizedPnlPercent: null, tradesCount: 0 });
       return;
     }
-    reply.send({ mode: modeOf(), ...deps.futuresPositions.todaysPnl() });
+    reply.send({ mode: futuresModeOf(), ...deps.futuresPositions.todaysPnl() });
   });
 
   app.post("/futures/positions", async (req, reply) => {
     if (!deps.futuresPositions) {
-      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
       return;
     }
     const parsed = openPositionSchema.safeParse(req.body);
     if (!parsed.success) {
-      reply.code(400).send({ mode: modeOf(), error: "invalid position request", details: parsed.error.flatten() });
+      reply.code(400).send({ mode: futuresModeOf(), error: "invalid position request", details: parsed.error.flatten() });
       return;
     }
-    if (isLiveMode() && !(req.body as { confirmLive?: boolean })?.confirmLive) {
-      reply.code(400).send({ mode: modeOf(), error: "Live trading requires confirmLive: true" });
+    // Was previously gated on spot's isLiveMode() — meant a real futures order could
+    // skip the confirmLive requirement whenever spot happened to be in paper mode
+    // (found alongside the mode-mislabeling bug above). Must check futures' own mode.
+    if (isFuturesLiveMode() && !(req.body as { confirmLive?: boolean })?.confirmLive) {
+      reply.code(400).send({ mode: futuresModeOf(), error: "Live trading requires confirmLive: true" });
       return;
     }
     const v = parsed.data;
@@ -304,7 +314,7 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
 
     if (v.orderType === "LIMIT") {
       if (!deps.futuresPendingOrders) {
-        reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+        reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
         return;
       }
       try {
@@ -318,9 +328,9 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
           takeProfitPercent: v.takeProfitPercent,
           stopLossPercent: v.stopLossPercent
         });
-        reply.code(201).send({ mode: modeOf(), pendingOrder });
+        reply.code(201).send({ mode: futuresModeOf(), pendingOrder });
       } catch (err) {
-        reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+        reply.code(400).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
       }
       return;
     }
@@ -336,52 +346,52 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     };
     try {
       const position = await deps.futuresPositions.open(input);
-      reply.code(201).send({ mode: modeOf(), position });
+      reply.code(201).send({ mode: futuresModeOf(), position });
     } catch (err) {
-      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      reply.code(400).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
 
   app.get("/futures/orders", async (_req, reply) => {
     if (!deps.futuresPendingOrders) {
-      reply.send({ mode: modeOf(), orders: [] });
+      reply.send({ mode: futuresModeOf(), orders: [] });
       return;
     }
-    reply.send({ mode: modeOf(), orders: deps.futuresPendingOrders.listPending() });
+    reply.send({ mode: futuresModeOf(), orders: deps.futuresPendingOrders.listPending() });
   });
 
   app.get<{ Querystring: { limit?: string } }>("/futures/orders/history", async (req, reply) => {
     if (!deps.futuresPendingOrders) {
-      reply.send({ mode: modeOf(), orders: [] });
+      reply.send({ mode: futuresModeOf(), orders: [] });
       return;
     }
     const limit = req.query.limit ? Number(req.query.limit) : 100;
-    reply.send({ mode: modeOf(), orders: deps.futuresPendingOrders.listHistory(limit) });
+    reply.send({ mode: futuresModeOf(), orders: deps.futuresPendingOrders.listHistory(limit) });
   });
 
   app.post<{ Params: { id: string } }>("/futures/orders/:id/cancel", async (req, reply) => {
     if (!deps.futuresPendingOrders) {
-      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
       return;
     }
     try {
       const order = await deps.futuresPendingOrders.cancelPending(req.params.id);
-      reply.send({ mode: modeOf(), order });
+      reply.send({ mode: futuresModeOf(), order });
     } catch (err) {
-      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      reply.code(400).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
 
   app.post<{ Params: { id: string } }>("/futures/positions/:id/close", async (req, reply) => {
     if (!deps.futuresPositions) {
-      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      reply.code(400).send({ mode: futuresModeOf(), error: "futures trading is not configured on this engine" });
       return;
     }
     try {
       const position = await deps.futuresPositions.close(req.params.id);
-      reply.send({ mode: modeOf(), position });
+      reply.send({ mode: futuresModeOf(), position });
     } catch (err) {
-      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      reply.code(400).send({ mode: futuresModeOf(), error: String(err instanceof Error ? err.message : err) });
     }
   });
 

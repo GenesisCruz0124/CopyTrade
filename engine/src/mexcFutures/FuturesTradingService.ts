@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { FuturesRestClient } from "./futuresRestClient.js";
+import type { FuturesExchangeClient } from "./futuresExchangeClient.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
 import type { FuturesOrderResult } from "./types.js";
 import { floorToStep } from "../mexc/symbolFilters.js";
@@ -23,7 +23,7 @@ export interface PlaceFuturesOrderInput {
  */
 export class FuturesTradingService {
   constructor(
-    private readonly futuresClient: FuturesRestClient,
+    private readonly futuresClient: FuturesExchangeClient,
     private readonly safety: SafetyRails
   ) {}
 

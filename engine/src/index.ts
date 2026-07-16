@@ -1,8 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { env, isLiveMode, isFuturesConfigured, isCopyTradingConfigured } from "./config/env.js";
+import Database from "better-sqlite3";
+import { env, isLiveMode, isFuturesAvailable, isFuturesLiveMode, isCopyTradingConfigured } from "./config/env.js";
 import { logger } from "./logger.js";
 import { getDb } from "./db/index.js";
+import { runMigrations } from "./db/migrations.js";
 import { MexcRestClient } from "./mexc/restClient.js";
 import { MexcWsClient } from "./mexc/wsClient.js";
 import { RestPricePoller } from "./mexc/restPricePoller.js";
@@ -13,6 +15,8 @@ import { SafetyRails } from "./safety/safetyRails.js";
 import { BotManager, type FuturesDeps } from "./botManager.js";
 import { startServer } from "./api/server.js";
 import { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
+import type { FuturesExchangeClient } from "./mexcFutures/futuresExchangeClient.js";
+import { PaperFuturesExchange } from "./mexcFutures/paperFuturesExchange.js";
 import { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
 import { FuturesPositionManager } from "./mexcFutures/futuresPositionManager.js";
 import { FuturesPendingOrderManager } from "./mexcFutures/futuresPendingOrderManager.js";
@@ -66,18 +70,55 @@ async function main() {
   let futures: FuturesDeps | undefined;
   let futuresPositions: FuturesPositionManager | undefined;
   let futuresPendingOrders: FuturesPendingOrderManager | undefined;
-  if (isFuturesConfigured()) {
-    const futuresClient = new FuturesRestClient({
-      accessKey: env.MEXC_FUTURES_ACCESS_KEY,
-      secretKey: env.MEXC_FUTURES_SECRET_KEY
-    });
+  if (isFuturesAvailable()) {
+    let futuresClient: FuturesExchangeClient;
+    let futuresDb: Database.Database;
+
+    if (isFuturesLiveMode()) {
+      futuresClient = new FuturesRestClient({
+        accessKey: env.MEXC_FUTURES_ACCESS_KEY,
+        secretKey: env.MEXC_FUTURES_SECRET_KEY
+      });
+      futuresDb = db;
+      logger.warn("FUTURES_TRADING_MODE=live — futures orders will be sent to MEXC for real");
+    } else {
+      // Dedicated in-memory db so paper positions/orders can never physically
+      // mix with real ones (not just filtered rows in the same table), and
+      // FuturesPositionManager/FuturesPendingOrderManager need zero code
+      // changes — they just persist to whichever db they're constructed with.
+      // Ephemeral by design (resets on restart), matching spot's PaperExchange.
+      futuresDb = new Database(":memory:");
+      runMigrations(futuresDb);
+      const liveMarketDataClient = new FuturesRestClient({
+        // contractDetail/ticker/klines/allContracts are all unsigned public
+        // endpoints — paper mode works even with no real keys configured.
+        accessKey: env.MEXC_FUTURES_ACCESS_KEY,
+        secretKey: env.MEXC_FUTURES_SECRET_KEY
+      });
+      futuresClient = new PaperFuturesExchange({
+        liveClient: liveMarketDataClient,
+        db: futuresDb,
+        seedBalanceUsdt: env.FUTURES_PAPER_SEED_BALANCE_USDT
+      });
+      logger.info(
+        { seedBalanceUsdt: env.FUTURES_PAPER_SEED_BALANCE_USDT },
+        "futures running in paper mode — no real futures orders will be sent"
+      );
+    }
+
     const futuresTrading = new FuturesTradingService(futuresClient, safety);
     futures = { futuresClient, futuresTrading };
-    futuresPositions = new FuturesPositionManager(db, futuresClient, safety, env.MAX_FUTURES_LEVERAGE);
-    futuresPendingOrders = new FuturesPendingOrderManager(db, futuresClient, safety, futuresPositions, env.MAX_FUTURES_LEVERAGE);
+    futuresPositions = new FuturesPositionManager(futuresDb, futuresClient, safety, env.MAX_FUTURES_LEVERAGE);
+    futuresPendingOrders = new FuturesPendingOrderManager(
+      futuresDb,
+      futuresClient,
+      safety,
+      futuresPositions,
+      env.MAX_FUTURES_LEVERAGE
+    );
     logger.info("MEXC futures trading configured");
   } else {
-    logger.info("MEXC_FUTURES_ACCESS_KEY/SECRET_KEY not set — futures bots disabled");
+    logger.info("FUTURES_TRADING_MODE=live but MEXC_FUTURES_ACCESS_KEY/SECRET_KEY not set — futures disabled");
   }
 
   const botManager = new BotManager(

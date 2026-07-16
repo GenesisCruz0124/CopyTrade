@@ -18,6 +18,11 @@ const envSchema = z.object({
   MEXC_FUTURES_SECRET_KEY: z.string().default(""),
   MAX_FUTURES_LEVERAGE: z.coerce.number().positive().default(20),
   MIN_LIQUIDATION_DISTANCE_PCT: z.coerce.number().positive().default(15),
+  // Independent of spot's TRADING_MODE — futures always hit the real MEXC API
+  // unless this is explicitly set to "paper". Paper mode simulates fills using
+  // real live prices and works even without MEXC_FUTURES_ACCESS_KEY/SECRET_KEY set.
+  FUTURES_TRADING_MODE: z.enum(["paper", "live"]).default("paper"),
+  FUTURES_PAPER_SEED_BALANCE_USDT: z.coerce.number().positive().default(50000),
 
   // --- Discord signal channel + Claude vision extraction ---
   DISCORD_BOT_TOKEN: z.string().default(""),
@@ -47,6 +52,10 @@ function loadEnv(): Env {
 export const env = loadEnv();
 
 export const isLiveMode = () => env.TRADING_MODE === "live";
+export const isFuturesLiveMode = () => env.FUTURES_TRADING_MODE === "live";
+/** "Real MEXC futures API keys are configured" — independent of paper/live mode. */
 export const isFuturesConfigured = () => !!env.MEXC_FUTURES_ACCESS_KEY && !!env.MEXC_FUTURES_SECRET_KEY;
+/** Paper mode is always available (no keys needed); live mode strictly requires real keys. */
+export const isFuturesAvailable = () => !isFuturesLiveMode() || isFuturesConfigured();
 export const isCopyTradingConfigured = () =>
-  isFuturesConfigured() && !!env.DISCORD_BOT_TOKEN && !!env.DISCORD_SIGNAL_CHANNEL_ID && !!env.ANTHROPIC_API_KEY;
+  isFuturesAvailable() && !!env.DISCORD_BOT_TOKEN && !!env.DISCORD_SIGNAL_CHANNEL_ID && !!env.ANTHROPIC_API_KEY;

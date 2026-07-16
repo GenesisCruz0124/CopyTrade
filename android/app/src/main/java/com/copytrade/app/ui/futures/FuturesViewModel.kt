@@ -126,16 +126,17 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val repo = app.repositoryFor(url)
-                val status = repo.getStatus()
-                val balance = runCatching { repo.getFuturesBalance() }.getOrNull()
+                // Futures has its own paper/live mode, independent of spot's — read it from
+                // a futures response, not repo.getStatus() (which only reflects spot's mode).
+                val balanceResponse = runCatching { repo.getFuturesBalance() }.getOrNull()
                 // Keep the last known positions on a failed fetch instead of silently
                 // showing an empty list — that previously made a real position look like
                 // it never opened when this call alone happened to fail (e.g. rate limit).
                 val positionsResult = runCatching { repo.getFuturesPositions() }
                 val positions = positionsResult.getOrDefault(_uiState.value.positions)
                 _uiState.value = _uiState.value.copy(
-                    mode = status.mode,
-                    balance = balance,
+                    mode = balanceResponse?.mode ?: _uiState.value.mode,
+                    balance = balanceResponse?.balance,
                     positions = positions,
                     isLoading = false,
                     error = positionsResult.exceptionOrNull()?.toUserMessage()

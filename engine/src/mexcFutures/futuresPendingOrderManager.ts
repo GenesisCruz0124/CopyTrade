@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import { FuturesRestClient, FuturesOrderStatusUnknownError } from "./futuresRestClient.js";
+import { FuturesOrderStatusUnknownError } from "./futuresRestClient.js";
+import type { FuturesExchangeClient } from "./futuresExchangeClient.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
 import { floorToStep } from "../mexc/symbolFilters.js";
 import { logger } from "../logger.js";
@@ -68,7 +69,7 @@ export interface FuturesPendingOrderRow {
 export class FuturesPendingOrderManager {
   constructor(
     private readonly db: Database.Database,
-    private readonly futuresClient: FuturesRestClient,
+    private readonly futuresClient: FuturesExchangeClient,
     private readonly safety: SafetyRails,
     private readonly positions: FuturesPositionManager,
     private readonly maxLeverage: number = 20

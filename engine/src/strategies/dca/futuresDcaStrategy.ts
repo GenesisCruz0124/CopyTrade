@@ -2,7 +2,7 @@ import cron, { type ScheduledTask } from "node-cron";
 import type Database from "better-sqlite3";
 import type { DcaConfig } from "../types.js";
 import type { FuturesTradingService } from "../../mexcFutures/FuturesTradingService.js";
-import type { FuturesRestClient } from "../../mexcFutures/futuresRestClient.js";
+import type { FuturesExchangeClient } from "../../mexcFutures/futuresExchangeClient.js";
 import { logger } from "../../logger.js";
 
 const CRON_PRESETS: Record<Exclude<DcaConfig["interval"], "custom">, string> = {
@@ -13,7 +13,7 @@ const CRON_PRESETS: Record<Exclude<DcaConfig["interval"], "custom">, string> = {
 
 export interface FuturesDcaStrategyDeps {
   db: Database.Database;
-  futuresClient: FuturesRestClient;
+  futuresClient: FuturesExchangeClient;
   futuresTrading: FuturesTradingService;
 }
 
