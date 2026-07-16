@@ -12,7 +12,8 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val serverUrl: String = "",
-    val language: AppLanguage = AppLanguage.ENGLISH
+    val language: AppLanguage = AppLanguage.ENGLISH,
+    val notificationsEnabled: Boolean = true
 )
 
 class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
@@ -23,7 +24,8 @@ class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
         viewModelScope.launch {
             val url = app.settingsRepository.serverUrl.first() ?: ""
             val lang = app.settingsRepository.language.first()
-            _uiState.value = SettingsUiState(serverUrl = url, language = lang)
+            val notificationsEnabled = app.settingsRepository.notificationsEnabled.first()
+            _uiState.value = SettingsUiState(serverUrl = url, language = lang, notificationsEnabled = notificationsEnabled)
         }
     }
 
@@ -31,6 +33,13 @@ class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
         viewModelScope.launch {
             app.settingsRepository.setLanguage(language)
             _uiState.value = _uiState.value.copy(language = language)
+        }
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            app.settingsRepository.setNotificationsEnabled(enabled)
+            _uiState.value = _uiState.value.copy(notificationsEnabled = enabled)
         }
     }
 

@@ -68,20 +68,23 @@ fun CopySignalsScreen(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        if (state.signals.isEmpty()) {
-            Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-                Text(Strings.noPendingSignals.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(padding)) {
+            state.error?.let {
+                Text(it, color = LossRed, modifier = Modifier.padding(16.dp))
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(state.signals, key = { it.id }) { signal ->
-                    CopySignalCard(signal = signal, serverUrl = serverUrl, onApprove = { viewModel.approve(signal.id) }, onReject = { viewModel.reject(signal.id) })
+            if (state.signals.isEmpty()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(Strings.noPendingSignals.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(state.signals, key = { it.id }) { signal ->
+                        CopySignalCard(signal = signal, serverUrl = serverUrl, onApprove = { viewModel.approve(signal.id) }, onReject = { viewModel.reject(signal.id) })
+                    }
                 }
             }
         }

@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.copytrade.app.notifications.SignalNotificationWatcher
 import com.copytrade.app.ui.activity.ActivityScreen
 import com.copytrade.app.ui.botdetail.BotDetailScreen
 import com.copytrade.app.ui.copysignals.CopySignalsScreen
@@ -22,6 +23,8 @@ import com.copytrade.app.ui.tradelog.TradeLogScreen
 @Composable
 fun CopyTradeNavGraph(startDestination: String) {
     val navController: NavHostController = rememberNavController()
+
+    SignalNotificationWatcher()
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Setup.route) {

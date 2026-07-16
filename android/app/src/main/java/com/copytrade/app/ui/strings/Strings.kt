@@ -100,6 +100,10 @@ object Strings {
     )
     val logout = Bi("Disconnect", "Idiskonekta")
 
+    // Notifications
+    val notificationsSection = Bi("Notifications", "Mga Notification")
+    val notifyNewSignals = Bi("Notify me on new Discord signals", "Ipaalam sa akin ang bagong Discord signal")
+
     // Common
     val retry = Bi("Retry", "Ulitin")
     val loading = Bi("Loading…", "Naglo-load…")
