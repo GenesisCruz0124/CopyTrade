@@ -106,7 +106,8 @@ export class FuturesRestClient {
       throw new Error(`MEXC futures request failed ${response.status}: ${text}`);
     }
 
-    const json = (await response.json()) as any;
+    const text = await response.text();
+    const json = parseJsonPreservingBigOrderIds(text);
     if (json.success === false) {
       throw new Error(`MEXC futures API error code=${json.code}: ${JSON.stringify(json.data ?? json.message ?? "")}`);
     }
@@ -254,6 +255,19 @@ export class FuturesRestClient {
       equity: Number(raw.equity)
     };
   }
+}
+
+/**
+ * MEXC order/position IDs are 18-19 digit integers, well beyond
+ * Number.MAX_SAFE_INTEGER (2^53-1). JSON.parse (and thus response.json())
+ * silently rounds them to the nearest representable double, corrupting the ID
+ * — verified live 2026-07-16: a real order ID came back as
+ * "832535434919189000" (trailing zeros from float rounding) and a later
+ * getOrder() lookup by that corrupted ID found nothing. Quoting long bare
+ * integers before parsing keeps them as exact strings instead.
+ */
+function parseJsonPreservingBigOrderIds(text: string): any {
+  return JSON.parse(text.replace(/:(\s*)(\d{16,})(\s*[,}\]])/g, ':$1"$2"$3'));
 }
 
 function mapOrderStatus(raw: any): FuturesOrderStatus {
