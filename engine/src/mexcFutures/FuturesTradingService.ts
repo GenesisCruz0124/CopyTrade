@@ -38,7 +38,16 @@ export class FuturesTradingService {
     const roundedQty = floorToStep(input.quantity, detail.volUnit || 1);
 
     if (roundedQty < detail.minVol) {
-      throw new Error(`quantity ${roundedQty} below contract minVol ${detail.minVol}`);
+      // Bare "quantity 0 below contract minVol 1" gave no clue why — spell out the
+      // actual dollar shortfall so it's obvious whether to raise the position size,
+      // leverage, or (for copy trading) COPY_TRADING_BUDGET_USDT/RISK_PCT_PER_TRADE.
+      const minNotionalUsdt = detail.minVol * roundedPrice * detail.contractSize;
+      const actualNotionalUsdt = input.quantity * roundedPrice * detail.contractSize;
+      throw new Error(
+        `sized quantity (${input.quantity.toFixed(6)} contracts, ≈$${actualNotionalUsdt.toFixed(2)} notional) is below ` +
+          `${input.symbol}'s exchange minimum of ${detail.minVol} contract(s) (≈$${minNotionalUsdt.toFixed(2)} notional needed) — ` +
+          `increase the position size or leverage to clear the minimum`
+      );
     }
     if (roundedQty > detail.maxVol) {
       throw new Error(`quantity ${roundedQty} exceeds contract maxVol ${detail.maxVol}`);
