@@ -3,6 +3,7 @@ package com.copytrade.app.ui.copysignals
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
+import com.copytrade.app.data.remote.toUserMessage
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +34,7 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
                 val signals = repo.getCopySignals("PENDING")
                 _uiState.value = _uiState.value.copy(signals = signals, isLoading = false)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
         }
     }
@@ -45,7 +46,7 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
                 app.repositoryFor(url).approveCopySignal(id)
                 refresh()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }
@@ -57,7 +58,7 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
                 app.repositoryFor(url).rejectCopySignal(id)
                 refresh()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }
