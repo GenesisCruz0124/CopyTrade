@@ -11,6 +11,7 @@ import type { CopySignalService } from "../copySignals/copySignalService.js";
 import type { FxRateService } from "../fx/fxRateService.js";
 import type { FuturesDeps } from "../botManager.js";
 import type { FuturesPositionManager, OpenPositionInput } from "../mexcFutures/futuresPositionManager.js";
+import type { FuturesPendingOrderManager } from "../mexcFutures/futuresPendingOrderManager.js";
 import { z } from "zod";
 
 export interface ApiServerDeps {
@@ -23,6 +24,7 @@ export interface ApiServerDeps {
   fxRates?: FxRateService;
   futures?: FuturesDeps;
   futuresPositions?: FuturesPositionManager;
+  futuresPendingOrders?: FuturesPendingOrderManager;
 }
 
 const openPositionSchema = z
@@ -34,10 +36,15 @@ const openPositionSchema = z
     amountUsd: z.number().positive().optional(),
     percentOfBalance: z.number().positive().max(100).optional(),
     takeProfitPercent: z.number().positive().optional(),
-    stopLossPercent: z.number().positive().optional()
+    stopLossPercent: z.number().positive().optional(),
+    orderType: z.enum(["MARKET", "LIMIT"]).default("MARKET"),
+    limitPrice: z.number().positive().optional()
   })
   .refine((v) => v.amountUsd != null || v.percentOfBalance != null, {
     message: "either amountUsd or percentOfBalance is required"
+  })
+  .refine((v) => v.orderType !== "LIMIT" || v.limitPrice != null, {
+    message: "limitPrice is required when orderType is LIMIT"
   });
 
 /**
@@ -293,18 +300,73 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
       return;
     }
     const v = parsed.data;
+    const sizing = v.amountUsd != null ? ({ mode: "usd", usdAmount: v.amountUsd } as const) : ({ mode: "percent", percent: v.percentOfBalance! } as const);
+
+    if (v.orderType === "LIMIT") {
+      if (!deps.futuresPendingOrders) {
+        reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+        return;
+      }
+      try {
+        const pendingOrder = await deps.futuresPendingOrders.openLimit({
+          symbol: v.symbol,
+          side: v.side,
+          leverage: v.leverage,
+          openType: v.openType,
+          sizing,
+          limitPrice: v.limitPrice!,
+          takeProfitPercent: v.takeProfitPercent,
+          stopLossPercent: v.stopLossPercent
+        });
+        reply.code(201).send({ mode: modeOf(), pendingOrder });
+      } catch (err) {
+        reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+      }
+      return;
+    }
+
     const input: OpenPositionInput = {
       symbol: v.symbol,
       side: v.side,
       leverage: v.leverage,
       openType: v.openType,
-      sizing: v.amountUsd != null ? { mode: "usd", usdAmount: v.amountUsd } : { mode: "percent", percent: v.percentOfBalance! },
+      sizing,
       takeProfitPercent: v.takeProfitPercent,
       stopLossPercent: v.stopLossPercent
     };
     try {
       const position = await deps.futuresPositions.open(input);
       reply.code(201).send({ mode: modeOf(), position });
+    } catch (err) {
+      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
+  app.get("/futures/orders", async (_req, reply) => {
+    if (!deps.futuresPendingOrders) {
+      reply.send({ mode: modeOf(), orders: [] });
+      return;
+    }
+    reply.send({ mode: modeOf(), orders: deps.futuresPendingOrders.listPending() });
+  });
+
+  app.get<{ Querystring: { limit?: string } }>("/futures/orders/history", async (req, reply) => {
+    if (!deps.futuresPendingOrders) {
+      reply.send({ mode: modeOf(), orders: [] });
+      return;
+    }
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+    reply.send({ mode: modeOf(), orders: deps.futuresPendingOrders.listHistory(limit) });
+  });
+
+  app.post<{ Params: { id: string } }>("/futures/orders/:id/cancel", async (req, reply) => {
+    if (!deps.futuresPendingOrders) {
+      reply.code(400).send({ mode: modeOf(), error: "futures trading is not configured on this engine" });
+      return;
+    }
+    try {
+      const order = await deps.futuresPendingOrders.cancelPending(req.params.id);
+      reply.send({ mode: modeOf(), order });
     } catch (err) {
       reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
     }

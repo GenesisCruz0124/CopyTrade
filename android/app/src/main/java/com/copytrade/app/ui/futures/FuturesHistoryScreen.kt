@@ -29,8 +29,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.copytrade.app.data.remote.dto.FuturesPendingOrderDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
+import androidx.compose.material3.OutlinedButton
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
@@ -69,7 +71,8 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
 
             TabRow(selectedTabIndex = tabIndex) {
                 Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text(Strings.openTab.resolve()) })
-                Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(Strings.historyTab.resolve()) })
+                Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(Strings.pendingTab.resolve()) })
+                Tab(selected = tabIndex == 2, onClick = { tabIndex = 2 }, text = { Text(Strings.historyTab.resolve()) })
             }
 
             state.error?.let {
@@ -87,6 +90,20 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.openPositions, key = { it.id }) { position ->
                             PositionCard(position = position, onClose = { viewModel.closePosition(position.id) })
+                        }
+                    }
+                }
+            } else if (tabIndex == 1) {
+                if (state.pendingOrders.isEmpty()) {
+                    Text(
+                        Strings.noPendingOrders.resolve(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(state.pendingOrders, key = { it.id }) { order ->
+                            PendingOrderCard(order = order, onCancel = { viewModel.cancelOrder(order.id) })
                         }
                     }
                 }
@@ -135,6 +152,53 @@ private fun TodayPnlCard(pnl: FuturesTodayPnlDto, modifier: Modifier = Modifier)
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit) {
+    val sideColor = if (order.side == "long") ProfitGreen else LossRed
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(order.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "${order.side.uppercase(Locale.US)} ${order.leverage.toInt()}x",
+                    color = sideColor,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${Strings.limitPriceLabel.resolve()}: ${formatPrice(order.limitPrice)}", style = MaterialTheme.typography.bodyMedium)
+                Text("${Strings.pendingStatusLabel.resolve()}: ${order.status}", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (order.filledQuantity > 0) {
+                Text(
+                    "${Strings.filledLabel.resolve()}: ${order.filledQuantity}/${order.quantity}" +
+                        (order.filledPrice?.let { " @ ${formatPrice(it)}" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                order.riskUsdt?.let {
+                    Text(
+                        "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    dateFormat.format(Date(order.createdAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text(Strings.cancelOrder.resolve(), color = LossRed)
             }
         }
     }

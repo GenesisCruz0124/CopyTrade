@@ -13,6 +13,7 @@ import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.FuturesBalanceDto
+import com.copytrade.app.data.remote.dto.FuturesPendingOrderDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
@@ -115,12 +116,17 @@ class EngineRepository(
 
     suspend fun getFuturesPositions(): List<FuturesPositionDto> = api.getFuturesPositions().positions
 
-    suspend fun openFuturesPosition(request: OpenFuturesPositionRequest): FuturesPositionDto? =
-        api.openFuturesPosition(request).position
+    suspend fun openFuturesPosition(request: OpenFuturesPositionRequest) = api.openFuturesPosition(request)
 
     suspend fun closeFuturesPosition(id: String): FuturesPositionDto? = api.closeFuturesPosition(id).position
 
     suspend fun getFuturesPositionsHistory(): List<FuturesPositionDto> = api.getFuturesPositionsHistory().positions
+
+    suspend fun getFuturesOrders(): List<FuturesPendingOrderDto> = api.getFuturesOrders().orders
+
+    suspend fun getFuturesOrdersHistory(): List<FuturesPendingOrderDto> = api.getFuturesOrdersHistory().orders
+
+    suspend fun cancelFuturesOrder(id: String): FuturesPendingOrderDto? = api.cancelFuturesOrder(id).order
 
     suspend fun getFuturesPrice(symbol: String): Double = api.getFuturesPrice(symbol).price
 

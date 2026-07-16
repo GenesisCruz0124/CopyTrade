@@ -15,6 +15,7 @@ import { startServer } from "./api/server.js";
 import { FuturesRestClient } from "./mexcFutures/futuresRestClient.js";
 import { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
 import { FuturesPositionManager } from "./mexcFutures/futuresPositionManager.js";
+import { FuturesPendingOrderManager } from "./mexcFutures/futuresPendingOrderManager.js";
 import { DiscordSignalListener } from "./discord/discordSignalListener.js";
 import { SignalExtractor } from "./vision/signalExtractor.js";
 import { CopySignalService } from "./copySignals/copySignalService.js";
@@ -64,6 +65,7 @@ async function main() {
 
   let futures: FuturesDeps | undefined;
   let futuresPositions: FuturesPositionManager | undefined;
+  let futuresPendingOrders: FuturesPendingOrderManager | undefined;
   if (isFuturesConfigured()) {
     const futuresClient = new FuturesRestClient({
       accessKey: env.MEXC_FUTURES_ACCESS_KEY,
@@ -72,6 +74,7 @@ async function main() {
     const futuresTrading = new FuturesTradingService(futuresClient, safety);
     futures = { futuresClient, futuresTrading };
     futuresPositions = new FuturesPositionManager(db, futuresClient, safety, env.MAX_FUTURES_LEVERAGE);
+    futuresPendingOrders = new FuturesPendingOrderManager(db, futuresClient, safety, futuresPositions, env.MAX_FUTURES_LEVERAGE);
     logger.info("MEXC futures trading configured");
   } else {
     logger.info("MEXC_FUTURES_ACCESS_KEY/SECRET_KEY not set — futures bots disabled");
@@ -102,6 +105,14 @@ async function main() {
   const futuresMonitorTimer = futuresPositions
     ? setInterval(() => {
         futuresPositions!.monitor().catch((err) => logger.error({ err }, "futures position monitor failed"));
+      }, 5000)
+    : undefined;
+
+  // Independent timer (not merged with futuresMonitorTimer) so a slow/erroring
+  // reconcile pass never delays TP/SL checks on already-open positions, or vice versa.
+  const futuresPendingOrdersTimer = futuresPendingOrders
+    ? setInterval(() => {
+        futuresPendingOrders!.reconcilePending().catch((err) => logger.error({ err }, "futures pending order reconcile failed"));
       }, 5000)
     : undefined;
 
@@ -148,7 +159,8 @@ async function main() {
     copySignals,
     fxRates,
     futures,
-    futuresPositions
+    futuresPositions,
+    futuresPendingOrders
   });
 
   const shutdown = async () => {
@@ -157,6 +169,7 @@ async function main() {
     pricePoller?.stop();
     clearInterval(reconcileTimer);
     if (futuresMonitorTimer) clearInterval(futuresMonitorTimer);
+    if (futuresPendingOrdersTimer) clearInterval(futuresPendingOrdersTimer);
     fxRates.stop();
     discordListener?.close();
     await app.close();

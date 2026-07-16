@@ -51,6 +51,33 @@ export interface FuturesOrderResult {
   state: string;
 }
 
+/**
+ * MEXC contract order-state enum (from GET /private/order/get/{id} and
+ * GET /private/order/list/open_orders/{symbol}). state=2 (uncompleted/pending)
+ * was verified live; 1/3/4/5 are per MEXC's published contract API docs and
+ * are consistent with the field naming/behavior observed for state=2.
+ */
+export type FuturesOrderState = 1 | 2 | 3 | 4 | 5; // 1=uninformed 2=uncompleted 3=completed 4=cancelled 5=invalid
+
+export interface FuturesOrderStatus {
+  orderId: string;
+  symbol: string;
+  externalOid: string;
+  state: FuturesOrderState;
+  side: FuturesOrderSide;
+  openType: FuturesOpenType;
+  orderType: "LIMIT" | "MARKET";
+  leverage: number;
+  price: number; // originally-submitted limit price
+  vol: number; // requested quantity, in contracts
+  dealVol: number; // cumulative filled quantity so far
+  dealAvgPrice: number; // average fill price (0 until any fill occurs)
+  takerFeeRate: number;
+  makerFeeRate: number;
+  createTime: number;
+  updateTime: number;
+}
+
 export interface FuturesPosition {
   symbol: string;
   positionId: string;

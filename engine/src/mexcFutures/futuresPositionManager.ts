@@ -4,6 +4,7 @@ import type { FuturesRestClient } from "./futuresRestClient.js";
 import type { SafetyRails } from "../safety/safetyRails.js";
 import { floorToStep } from "../mexc/symbolFilters.js";
 import { logger } from "../logger.js";
+import { buildFuturesPositionRow } from "./futuresPositionRowFactory.js";
 
 export interface OpenPositionInput {
   symbol: string;
@@ -96,48 +97,34 @@ export class FuturesPositionManager {
 
     const price = ticker.fairPrice;
 
-    // Validate TP/SL against the current price BEFORE placing anything — a bad
-    // percentage (e.g. a stop-loss of 100%+ that implies a negative price) must
-    // reject the request outright rather than open a position with no working stop.
-    if (input.takeProfitPercent != null && input.takeProfitPercent <= 0) {
-      throw new Error("take-profit percent must be greater than 0");
-    }
-    if (input.stopLossPercent != null && (input.stopLossPercent <= 0 || input.stopLossPercent >= 100)) {
-      throw new Error("stop-loss percent must be greater than 0 and less than 100");
-    }
-    const takeProfitPrice =
-      input.takeProfitPercent != null
-        ? input.side === "long"
-          ? price * (1 + input.takeProfitPercent / 100)
-          : price * (1 - input.takeProfitPercent / 100)
-        : null;
-    const stopLossPrice =
-      input.stopLossPercent != null
-        ? input.side === "long"
-          ? price * (1 - input.stopLossPercent / 100)
-          : price * (1 + input.stopLossPercent / 100)
-        : null;
-    if (takeProfitPrice != null && takeProfitPrice <= 0) {
-      throw new Error("take-profit percent is too large — would result in a non-positive price");
-    }
-    if (stopLossPrice != null && stopLossPrice <= 0) {
-      throw new Error("stop-loss percent is too large — would result in a non-positive price");
-    }
-    if (
-      takeProfitPrice != null &&
-      stopLossPrice != null &&
-      (input.side === "long"
-        ? !(stopLossPrice < price && price < takeProfitPrice)
-        : !(takeProfitPrice < price && price < stopLossPrice))
-    ) {
-      throw new Error("take-profit and stop-loss must be on the correct side of the current price");
-    }
-
     const notional = marginUsdt * input.leverage;
     const rawQty = notional / (price * detail.contractSize);
     const qty = floorToStep(rawQty, detail.volUnit || 1);
     if (qty < detail.minVol) throw new Error(`sized quantity ${qty} below contract minVol ${detail.minVol}`);
     if (qty > detail.maxVol) throw new Error(`sized quantity ${qty} exceeds contract maxVol ${detail.maxVol}`);
+
+    // Validate TP/SL against the current price BEFORE placing anything — a bad
+    // percentage (e.g. a stop-loss of 100%+ that implies a negative price) must
+    // reject the request outright rather than open a position with no working stop.
+    // This dry call's return value is discarded; only its validation (and the
+    // computed TP/SL prices, reused below) matter here.
+    const id = randomUUID();
+    buildFuturesPositionRow({
+      id,
+      symbol: input.symbol,
+      side: input.side,
+      leverage: input.leverage,
+      openType: input.openType,
+      entryPrice: price,
+      quantity: qty,
+      contractSize: detail.contractSize,
+      marginUsdt,
+      takeProfitPercent: input.takeProfitPercent,
+      stopLossPercent: input.stopLossPercent,
+      takerFeeRate: detail.takerFeeRate,
+      orderId: null,
+      now: Date.now()
+    });
 
     const side = input.side === "long" ? 1 : 3; // 1=open long, 3=open short
     const externalOid = `man-${randomUUID().slice(0, 10)}`;
@@ -151,39 +138,33 @@ export class FuturesPositionManager {
       externalOid
     });
 
-    const riskUsdt = input.stopLossPercent != null ? marginUsdt * input.leverage * (input.stopLossPercent / 100) : null;
     // Market orders are always taker fills; capture the rate now so close() can
     // compute its own fee later without another contractDetail round trip.
-    const openFeeUsdt = qty * price * detail.contractSize * detail.takerFeeRate;
-
-    const id = randomUUID();
-    const now = Date.now();
-    const row: FuturesPositionRow = {
+    const row = buildFuturesPositionRow({
       id,
       symbol: input.symbol,
       side: input.side,
       leverage: input.leverage,
-      open_type: input.openType,
-      entry_price: price,
+      openType: input.openType,
+      entryPrice: price,
       quantity: qty,
-      contract_size: detail.contractSize,
-      margin_usdt: marginUsdt,
-      take_profit_price: takeProfitPrice,
-      stop_loss_price: stopLossPrice,
-      risk_usdt: riskUsdt,
-      taker_fee_rate: detail.takerFeeRate,
-      open_fee_usdt: openFeeUsdt,
-      close_fee_usdt: null,
-      status: "open",
-      close_price: null,
-      close_reason: null,
-      realized_pnl_usdt: null,
-      order_id: result.orderId,
-      created_at: now,
-      updated_at: now,
-      closed_at: null
-    };
+      contractSize: detail.contractSize,
+      marginUsdt,
+      takeProfitPercent: input.takeProfitPercent,
+      stopLossPercent: input.stopLossPercent,
+      takerFeeRate: detail.takerFeeRate,
+      orderId: result.orderId,
+      now: Date.now()
+    });
 
+    this.insertRow(row);
+    return row;
+  }
+
+  /** Inserts a pre-built futures_positions row. Exposed so FuturesPendingOrderManager
+   *  can reuse the same insert path once a detected LIMIT fill produces a row via
+   *  buildFuturesPositionRow, instead of duplicating this SQL. */
+  insertRow(row: FuturesPositionRow): void {
     this.db
       .prepare(
         `INSERT INTO futures_positions
@@ -193,8 +174,6 @@ export class FuturesPositionManager {
                  @take_profit_price, @stop_loss_price, @risk_usdt, @taker_fee_rate, @open_fee_usdt, @status, @order_id, @created_at, @updated_at)`
       )
       .run(row);
-
-    return row;
   }
 
   async close(positionId: string, reason = "manual"): Promise<FuturesPositionRow> {

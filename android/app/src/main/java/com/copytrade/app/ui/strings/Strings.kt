@@ -175,6 +175,16 @@ object Strings {
     val takeProfitByPercent = Bi("Take-profit %", "Take-profit %")
     val takeProfitByPrice = Bi("Take-profit price", "Take-profit price")
     val takeProfitPriceLabel = Bi("Take-profit price (USD)", "Take-profit price (USD)")
+    val orderTypeLabel = Bi("Order type", "Order type")
+    val orderTypeMarket = Bi("Market", "Market")
+    val orderTypeLimit = Bi("Limit", "Limit")
+    val limitPriceLabel = Bi("Limit price (USD)", "Limit price (USD)")
+    val orderPlaced = Bi("Order placed", "Naisumite ang order")
+    val pendingTab = Bi("Pending", "Pending")
+    val noPendingOrders = Bi("No pending orders", "Walang pending na order")
+    val cancelOrder = Bi("Cancel order", "Kanselahin ang order")
+    val pendingStatusLabel = Bi("Status", "Status")
+    val filledLabel = Bi("Filled", "Napuno")
 }
 
 @Composable
