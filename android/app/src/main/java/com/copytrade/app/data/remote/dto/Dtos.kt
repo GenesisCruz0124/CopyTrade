@@ -81,6 +81,42 @@ data class TradesResponseDto(
 )
 
 @Serializable
+data class SignalIndicatorsDto(
+    val price: Double,
+    val emaFast: Double,
+    val emaSlow: Double,
+    val rsi: Double,
+    val macd: Double,
+    val macdSignal: Double,
+    val macdHistogram: Double,
+    val atr: Double
+)
+
+@Serializable
+data class SignalDto(
+    val symbol: String,
+    val interval: String,
+    val signal: String,
+    val confidence: Int,
+    val score: Double,
+    val indicators: SignalIndicatorsDto,
+    val reasons: List<String> = emptyList(),
+    val suggestedEntry: Double,
+    val stopLoss: Double,
+    val takeProfit: Double,
+    val riskRewardRatio: Double? = null,
+    val candlesAnalyzed: Int,
+    val generatedAt: Long
+)
+
+@Serializable
+data class SignalResponseDto(
+    val mode: String,
+    val signal: SignalDto? = null,
+    val error: String? = null
+)
+
+@Serializable
 data class OrderDto(
     val id: String,
     @kotlinx.serialization.SerialName("bot_id") val botId: String,
