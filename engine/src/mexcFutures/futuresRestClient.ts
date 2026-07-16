@@ -209,7 +209,10 @@ export class FuturesRestClient {
   }
 
   async cancelOrder(orderId: string): Promise<void> {
-    await this.request("POST", "/private/order/cancel", { orderIds: [orderId] } as any, { signed: true, queue: this.orderQueue });
+    // MEXC's /private/order/cancel expects a bare JSON array of order IDs as the
+    // request body — not `{ orderIds: [...] }` — confirmed live 2026-07-16 ("Parameter
+    // error" code=600 with the object shape; a bare array is MEXC's documented contract).
+    await this.request("POST", "/private/order/cancel", [orderId] as any, { signed: true, queue: this.orderQueue });
   }
 
   async getOrder(orderId: string): Promise<FuturesOrderStatus> {
