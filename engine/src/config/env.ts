@@ -34,7 +34,14 @@ const envSchema = z.object({
   COPY_TRADING_BUDGET_USDT: z.coerce.number().positive().default(100),
   COPY_TRADING_RISK_PCT_PER_TRADE: z.coerce.number().positive().default(2),
   COPY_TRADING_DEFAULT_LEVERAGE: z.coerce.number().positive().default(3),
-  COPY_TRADING_MARGIN_MODE: z.enum(["isolated", "cross"]).default("isolated")
+  COPY_TRADING_MARGIN_MODE: z.enum(["isolated", "cross"]).default("isolated"),
+
+  // --- Background market-signal monitor ---
+  // Comma-separated watchlist (e.g. "BTCUSDT,ETHUSDT"); empty disables the monitor.
+  SIGNAL_MONITOR_SYMBOLS: z.string().default(""),
+  SIGNAL_MONITOR_INTERVAL: z.string().default("15m"),
+  SIGNAL_MONITOR_MIN_CONFIDENCE: z.coerce.number().min(0).max(100).default(60),
+  SIGNAL_MONITOR_POLL_SECONDS: z.coerce.number().int().positive().default(300)
 });
 
 export type Env = z.infer<typeof envSchema>;
