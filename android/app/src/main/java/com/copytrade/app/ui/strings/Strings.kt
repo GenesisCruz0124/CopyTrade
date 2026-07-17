@@ -114,6 +114,9 @@ object Strings {
     val noPendingSignals = Bi("No pending signals", "Walang pending na signal")
     val approve = Bi("Approve", "Aprubahan")
     val reject = Bi("Reject", "Tanggihan")
+    val signalValid = Bi("Valid", "Valid")
+    val signalInvalid = Bi("Invalid", "Invalid")
+    val signalNotChecked = Bi("Not checked", "Hindi pa na-check")
     val copyToFutures = Bi("Copy to Futures", "Kopyahin sa Futures")
     val copyToFuturesHint = Bi(
         "Opens the Futures form pre-filled — set your size/risk, then place the order.",

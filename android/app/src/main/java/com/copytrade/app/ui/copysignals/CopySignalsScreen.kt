@@ -1,6 +1,8 @@
 package com.copytrade.app.ui.copysignals
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -101,6 +104,28 @@ fun CopySignalsScreen(onBack: () -> Unit, onOpenFutures: () -> Unit) {
     }
 }
 
+/** At-a-glance FYI for the trader: is this signal still actionable vs its SL/TP? */
+@Composable
+private fun ValidityBadge(priceCheck: String?) {
+    val (label, color) = when (priceCheck) {
+        "valid" -> Strings.signalValid.resolve() to ProfitGreen
+        "tp_hit", "sl_hit" -> Strings.signalInvalid.resolve() to LossRed
+        else -> Strings.signalNotChecked.resolve() to PaperOrange
+    }
+    Box(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .background(color.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = label.uppercase(Locale.US),
+            color = color,
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
 @Composable
 private fun CopySignalCard(
     signal: CopySignalDto,
@@ -134,6 +159,8 @@ private fun CopySignalCard(
                 Text(text = (signal.side ?: "?").uppercase(Locale.US), color = sideColor, style = MaterialTheme.typography.titleMedium)
             }
 
+            ValidityBadge(priceCheck = signal.priceCheck)
+
             signal.leverage?.let { Text("Leverage: ${it.toInt()}x", style = MaterialTheme.typography.bodyMedium) }
             signal.entryPrice?.let { Text("Entry: $it", style = MaterialTheme.typography.bodyMedium) }
             signal.stopLoss?.let { Text("SL: $it", style = MaterialTheme.typography.bodyMedium) }
@@ -146,17 +173,11 @@ private fun CopySignalCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            if (signal.priceCheck == "tp_hit" || signal.priceCheck == "sl_hit") {
+            // Explain WHY when invalidated; the badge above already flags the state.
+            if ((signal.priceCheck == "tp_hit" || signal.priceCheck == "sl_hit") && !signal.priceNote.isNullOrBlank()) {
                 Text(
-                    text = signal.priceNote ?: "",
+                    text = signal.priceNote,
                     color = LossRed,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            } else if (signal.priceCheck == "valid") {
-                Text(
-                    text = "Price still valid vs SL/TP",
-                    color = ProfitGreen,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp)
                 )
