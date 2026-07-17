@@ -1,6 +1,7 @@
 package com.copytrade.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -21,8 +22,21 @@ import com.copytrade.app.ui.signals.SignalsScreen
 import com.copytrade.app.ui.tradelog.TradeLogScreen
 
 @Composable
-fun CopyTradeNavGraph(startDestination: String) {
+fun CopyTradeNavGraph(
+    startDestination: String,
+    deepLinkRoute: String? = null,
+    onDeepLinkHandled: () -> Unit = {}
+) {
     val navController: NavHostController = rememberNavController()
+
+    // A tapped notification asks to open a specific page. Navigate there once the
+    // graph is up (but not while the user still needs to set up / connect).
+    LaunchedEffect(deepLinkRoute) {
+        if (deepLinkRoute != null && startDestination != Screen.Setup.route) {
+            navController.navigate(deepLinkRoute) { launchSingleTop = true }
+        }
+        if (deepLinkRoute != null) onDeepLinkHandled()
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Setup.route) {
@@ -54,7 +68,12 @@ fun CopyTradeNavGraph(startDestination: String) {
             ActivityScreen(onBack = { navController.popBackStack() })
         }
         composable(Screen.CopySignals.route) {
-            CopySignalsScreen(onBack = { navController.popBackStack() })
+            CopySignalsScreen(
+                onBack = { navController.popBackStack() },
+                // Approving a valid signal stores a Futures prefill, then this
+                // navigates to the pre-populated Futures form.
+                onOpenFutures = { navController.navigate(Screen.Futures.route) }
+            )
         }
         composable(Screen.Signals.route) {
             SignalsScreen(

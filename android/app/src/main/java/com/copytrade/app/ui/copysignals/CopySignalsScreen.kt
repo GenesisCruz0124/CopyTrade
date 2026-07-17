@@ -1,6 +1,8 @@
 package com.copytrade.app.ui.copysignals
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -24,9 +27,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -37,7 +39,6 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.buildAuthenticatedHttpClient
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.ui.appViewModel
-import com.copytrade.app.ui.components.ConfirmDialog
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -45,16 +46,18 @@ import com.copytrade.app.ui.theme.LossRed
 import com.copytrade.app.ui.theme.PaperOrange
 import com.copytrade.app.ui.theme.ProfitGreen
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CopySignalsScreen(onBack: () -> Unit) {
+fun CopySignalsScreen(onBack: () -> Unit, onOpenFutures: () -> Unit) {
     val viewModel = appViewModel { CopySignalsViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     val app = LocalContext.current.applicationContext as CopyTradeApp
     val serverUrl = remember { runBlocking { app.settingsRepository.serverUrl.first() } ?: "" }
+    val scope = rememberCoroutineScope()
 
     PollWhileForeground { viewModel.refresh() }
 
@@ -83,7 +86,17 @@ fun CopySignalsScreen(onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(state.signals, key = { it.id }) { signal ->
-                        CopySignalCard(signal = signal, serverUrl = serverUrl, onApprove = { viewModel.approve(signal.id) }, onReject = { viewModel.reject(signal.id) })
+                        CopySignalCard(
+                            signal = signal,
+                            serverUrl = serverUrl,
+                            canCopy = viewModel.canCopyToFutures(signal),
+                            onCopyToFutures = {
+                                scope.launch {
+                                    if (viewModel.prepareFuturesHandoff(signal)) onOpenFutures()
+                                }
+                            },
+                            onReject = { viewModel.reject(signal.id) }
+                        )
                     }
                 }
             }
@@ -91,9 +104,36 @@ fun CopySignalsScreen(onBack: () -> Unit) {
     }
 }
 
+/** At-a-glance FYI for the trader: is this signal still actionable vs its SL/TP? */
 @Composable
-private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: () -> Unit, onReject: () -> Unit) {
-    var showApproveConfirm by remember { mutableStateOf(false) }
+private fun ValidityBadge(priceCheck: String?) {
+    val (label, color) = when (priceCheck) {
+        "valid" -> Strings.signalValid.resolve() to ProfitGreen
+        "tp_hit", "sl_hit" -> Strings.signalInvalid.resolve() to LossRed
+        else -> Strings.signalNotChecked.resolve() to PaperOrange
+    }
+    Box(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .background(color.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = label.uppercase(Locale.US),
+            color = color,
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun CopySignalCard(
+    signal: CopySignalDto,
+    serverUrl: String,
+    canCopy: Boolean,
+    onCopyToFutures: () -> Unit,
+    onReject: () -> Unit
+) {
     val app = LocalContext.current.applicationContext as CopyTradeApp
     val imageLoader = remember { coil.ImageLoader.Builder(app).okHttpClient { buildAuthenticatedHttpClient(app.settingsRepository) }.build() }
     val imageUrl = "${serverUrl.trimEnd('/')}/copy-signals/${signal.id}/image"
@@ -119,6 +159,8 @@ private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: 
                 Text(text = (signal.side ?: "?").uppercase(Locale.US), color = sideColor, style = MaterialTheme.typography.titleMedium)
             }
 
+            ValidityBadge(priceCheck = signal.priceCheck)
+
             signal.leverage?.let { Text("Leverage: ${it.toInt()}x", style = MaterialTheme.typography.bodyMedium) }
             signal.entryPrice?.let { Text("Entry: $it", style = MaterialTheme.typography.bodyMedium) }
             signal.stopLoss?.let { Text("SL: $it", style = MaterialTheme.typography.bodyMedium) }
@@ -131,44 +173,37 @@ private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: 
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            if (signal.priceCheck == "tp_hit" || signal.priceCheck == "sl_hit") {
+            // Explain WHY when invalidated; the badge above already flags the state.
+            if ((signal.priceCheck == "tp_hit" || signal.priceCheck == "sl_hit") && !signal.priceNote.isNullOrBlank()) {
                 Text(
-                    text = signal.priceNote ?: "",
+                    text = signal.priceNote,
                     color = LossRed,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp)
                 )
-            } else if (signal.priceCheck == "valid") {
-                Text(
-                    text = "Price still valid vs SL/TP",
-                    color = ProfitGreen,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
             }
+
+            // Copying to Futures never executes — it hands the signal's params to
+            // the Futures form where the user sets size/risk and places the order.
+            Text(
+                text = Strings.copyToFuturesHint.resolve(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
 
             Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onReject, modifier = Modifier.fillMaxWidth().weight(1f)) {
                     Text(Strings.reject.resolve(), color = LossRed)
                 }
-                Button(onClick = { showApproveConfirm = true }, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    Text(Strings.approve.resolve())
+                Button(
+                    onClick = onCopyToFutures,
+                    enabled = canCopy,
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                ) {
+                    Text(Strings.copyToFutures.resolve())
                 }
             }
         }
-    }
-
-    if (showApproveConfirm) {
-        ConfirmDialog(
-            title = Strings.approveConfirmTitle,
-            message = Strings.approveConfirmMessage,
-            confirmLabel = Strings.confirm,
-            cancelLabel = Strings.cancel,
-            onConfirm = {
-                showApproveConfirm = false
-                onApprove()
-            },
-            onDismiss = { showApproveConfirm = false }
-        )
     }
 }

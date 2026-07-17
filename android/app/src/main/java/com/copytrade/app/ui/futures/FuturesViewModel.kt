@@ -30,6 +30,10 @@ private fun formatPercent(v: Double): String {
 
 private fun formatAmount(v: Double): String = String.format(java.util.Locale.US, "%.2f", v)
 
+/** Plain decimal string for a price input field — no scientific notation, no trailing zeros. */
+private fun Double.toPriceInput(): String =
+    java.math.BigDecimal.valueOf(this).stripTrailingZeros().toPlainString()
+
 data class FuturesUiState(
     val mode: String = "paper",
     val symbols: List<FuturesSymbolDto> = emptyList(),
@@ -99,11 +103,54 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 symbolQuery = symbol,
                 favorites = settings.futuresFavoriteSymbols.first()
             )
-            if (symbol.isNotBlank()) {
+            // A one-shot prefill (e.g. handed off from an approved copy signal)
+            // overrides the persisted selection with the signal's symbol/side/
+            // leverage and its entry/SL/TP bracket. Size is deliberately left for
+            // the user to set. Cleared after applying so it fires only once.
+            val prefill = FuturesPrefill.fromJsonOrNull(settings.futuresPrefill.first())
+            if (prefill != null) {
+                applyPrefill(prefill)
+                settings.clearFuturesPrefill()
+            }
+            if (_uiState.value.selectedSymbol.isNotBlank()) {
                 refreshPrice()
                 refreshKlines()
             }
         }
+    }
+
+    private suspend fun applyPrefill(prefill: FuturesPrefill) {
+        var next = _uiState.value.copy(
+            selectedSymbol = prefill.symbol,
+            symbolQuery = prefill.symbol,
+            side = prefill.side,
+            currentPrice = null,
+            klines = emptyList()
+        )
+        prefill.leverage?.let { next = next.copy(leverage = it.toString()) }
+        // Enter at the signal's entry as a LIMIT order; the user can switch to MARKET.
+        prefill.entryPrice?.let {
+            next = next.copy(orderType = OrderTypeMode.LIMIT, limitPrice = it.toPriceInput())
+        }
+        prefill.stopLoss?.let {
+            next = next.copy(
+                stopLossInputMode = SlInputMode.PRICE,
+                stopLossPriceUsd = it.toPriceInput(),
+                stopLossPercent = ""
+            )
+        }
+        prefill.takeProfit?.let {
+            next = next.copy(
+                takeProfitInputMode = TpInputMode.PRICE,
+                takeProfitPriceUsd = it.toPriceInput(),
+                takeProfitPercent = ""
+            )
+        }
+        _uiState.value = next
+        // Persist symbol/side/leverage so they behave like a normal manual pick.
+        app.settingsRepository.setFuturesSymbol(prefill.symbol)
+        app.settingsRepository.setFuturesSide(prefill.side)
+        prefill.leverage?.let { app.settingsRepository.setFuturesLeverage(it.toString()) }
     }
 
     private fun loadSymbols() {

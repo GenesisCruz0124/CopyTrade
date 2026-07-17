@@ -50,6 +50,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.ConfirmDialog
@@ -255,6 +256,27 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
+            }
+
+            state.futuresAvailableUsdt?.let {
+                Spacer(Modifier.height(12.dp))
+                Divider()
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = Strings.futuresAvailable.resolve(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = String.format(Locale.US, "%.2f USDT", it),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             if (nonZeroBalances.isNotEmpty()) {

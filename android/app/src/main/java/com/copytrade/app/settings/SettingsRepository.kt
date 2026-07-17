@@ -31,6 +31,9 @@ class SettingsRepository(private val context: Context) {
     private val futuresSideKey = stringPreferencesKey("futures_side")
     private val futuresSymbolKey = stringPreferencesKey("futures_symbol")
     private val futuresFavoriteSymbolsKey = stringSetPreferencesKey("futures_favorite_symbols")
+    // One-shot JSON payload used to pre-fill the Futures form (e.g. from an
+    // approved copy signal). Consumed and cleared by FuturesViewModel on load.
+    private val futuresPrefillKey = stringPreferencesKey("futures_prefill")
     private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
     private val notifiedSignalIdsKey = stringSetPreferencesKey("notified_signal_ids")
 
@@ -66,6 +69,7 @@ class SettingsRepository(private val context: Context) {
     val futuresSide: Flow<String> = context.dataStore.data.map { it[futuresSideKey] ?: "long" }
     val futuresSymbol: Flow<String> = context.dataStore.data.map { it[futuresSymbolKey] ?: "" }
     val futuresFavoriteSymbols: Flow<Set<String>> = context.dataStore.data.map { it[futuresFavoriteSymbolsKey] ?: emptySet() }
+    val futuresPrefill: Flow<String?> = context.dataStore.data.map { it[futuresPrefillKey] }
 
     /** Whether a system notification should be raised when a new Discord copy signal arrives. Defaults to on. */
     val notificationsEnabled: Flow<Boolean> = context.dataStore.data.map { it[notificationsEnabledKey] ?: true }
@@ -99,6 +103,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setFuturesSymbol(symbol: String) {
         context.dataStore.edit { it[futuresSymbolKey] = symbol }
+    }
+
+    suspend fun setFuturesPrefill(json: String) {
+        context.dataStore.edit { it[futuresPrefillKey] = json }
+    }
+
+    suspend fun clearFuturesPrefill() {
+        context.dataStore.edit { it.remove(futuresPrefillKey) }
     }
 
     suspend fun toggleFuturesFavoriteSymbol(symbol: String) {

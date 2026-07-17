@@ -17,6 +17,7 @@ data class DashboardUiState(
     val balances: List<BalanceDto> = emptyList(),
     val totalValueUsdt: Double? = null,
     val totalValuePhp: Double? = null,
+    val futuresAvailableUsdt: Double? = null,
     val bots: List<BotEntity> = emptyList(),
     val isRefreshing: Boolean = false,
     val killSwitchEngaged: Boolean = false,
@@ -48,11 +49,15 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                 val repo = app.repositoryFor(url)
                 val status = repo.getStatus()
                 repo.refreshBots()
+                // Futures balance is a separate endpoint and may be unconfigured —
+                // treat any failure as "not available" rather than failing the refresh.
+                val futuresAvailable = runCatching { repo.getFuturesBalance().balance?.availableBalance }.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     mode = status.mode,
                     balances = status.balances,
                     totalValueUsdt = status.totalValueUsdt,
                     totalValuePhp = status.totalValuePhp,
+                    futuresAvailableUsdt = futuresAvailable,
                     killSwitchEngaged = status.killSwitchEngaged,
                     isRefreshing = false
                 )

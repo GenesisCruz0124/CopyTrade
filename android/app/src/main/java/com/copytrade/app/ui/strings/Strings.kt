@@ -32,6 +32,7 @@ object Strings {
     // Dashboard
     val dashboardTitle = Bi("Dashboard", "Dashboard")
     val totalBalance = Bi("Total balance", "Kabuuang balanse")
+    val futuresAvailable = Bi("Futures available", "Available sa Futures")
     val activeBots = Bi("Active bots", "Mga aktibong bot")
     val noBotsYet = Bi("No bots yet. Tap + to create one.", "Wala pang bot. I-tap ang + para gumawa.")
     val killSwitch = Bi("Kill switch", "Kill switch")
@@ -114,6 +115,14 @@ object Strings {
     val noPendingSignals = Bi("No pending signals", "Walang pending na signal")
     val approve = Bi("Approve", "Aprubahan")
     val reject = Bi("Reject", "Tanggihan")
+    val signalValid = Bi("Valid", "Valid")
+    val signalInvalid = Bi("Invalid", "Invalid")
+    val signalNotChecked = Bi("Not checked", "Hindi pa na-check")
+    val copyToFutures = Bi("Copy to Futures", "Kopyahin sa Futures")
+    val copyToFuturesHint = Bi(
+        "Opens the Futures form pre-filled — set your size/risk, then place the order.",
+        "Bubuksan ang Futures form na naka-fill na — ilagay ang size/risk, tapos i-place ang order."
+    )
     val approveConfirmTitle = Bi("Approve this signal?", "Aaprubahan ang signal na ito?")
     val approveConfirmMessage = Bi(
         "This will open a real futures position sized from your copy-trading budget.",
