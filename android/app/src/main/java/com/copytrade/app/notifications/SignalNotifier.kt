@@ -12,10 +12,14 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.MainActivity
 import com.copytrade.app.R
 import com.copytrade.app.data.remote.dto.CopySignalDto
+import com.copytrade.app.ui.navigation.Screen
 import kotlinx.coroutines.flow.first
 import java.util.Locale
 
 const val COPY_SIGNALS_NOTIFICATION_CHANNEL_ID = "copy_signals"
+
+/** Intent extra carrying the in-app route to open when a notification is tapped. */
+const val EXTRA_NAV_ROUTE = "nav_route"
 
 /** Checks for new PENDING copy signals not yet seen and raises a system notification
  *  for each one. Called on a loop by SignalPollingService, which keeps this running
@@ -42,6 +46,8 @@ suspend fun pollForNewSignals(app: CopyTradeApp) {
 private fun buildSignalNotification(context: Context, signal: CopySignalDto): android.app.Notification {
     val openAppIntent = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        // Tapping the notification should land on the Copy signals page.
+        putExtra(EXTRA_NAV_ROUTE, Screen.CopySignals.route)
     }
     val pendingIntent = PendingIntent.getActivity(
         context,
