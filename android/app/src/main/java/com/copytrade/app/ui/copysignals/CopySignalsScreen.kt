@@ -24,9 +24,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -37,7 +36,6 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.buildAuthenticatedHttpClient
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.ui.appViewModel
-import com.copytrade.app.ui.components.ConfirmDialog
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -45,16 +43,18 @@ import com.copytrade.app.ui.theme.LossRed
 import com.copytrade.app.ui.theme.PaperOrange
 import com.copytrade.app.ui.theme.ProfitGreen
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CopySignalsScreen(onBack: () -> Unit) {
+fun CopySignalsScreen(onBack: () -> Unit, onOpenFutures: () -> Unit) {
     val viewModel = appViewModel { CopySignalsViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     val app = LocalContext.current.applicationContext as CopyTradeApp
     val serverUrl = remember { runBlocking { app.settingsRepository.serverUrl.first() } ?: "" }
+    val scope = rememberCoroutineScope()
 
     PollWhileForeground { viewModel.refresh() }
 
@@ -83,7 +83,17 @@ fun CopySignalsScreen(onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(state.signals, key = { it.id }) { signal ->
-                        CopySignalCard(signal = signal, serverUrl = serverUrl, onApprove = { viewModel.approve(signal.id) }, onReject = { viewModel.reject(signal.id) })
+                        CopySignalCard(
+                            signal = signal,
+                            serverUrl = serverUrl,
+                            canCopy = viewModel.canCopyToFutures(signal),
+                            onCopyToFutures = {
+                                scope.launch {
+                                    if (viewModel.prepareFuturesHandoff(signal)) onOpenFutures()
+                                }
+                            },
+                            onReject = { viewModel.reject(signal.id) }
+                        )
                     }
                 }
             }
@@ -92,8 +102,13 @@ fun CopySignalsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: () -> Unit, onReject: () -> Unit) {
-    var showApproveConfirm by remember { mutableStateOf(false) }
+private fun CopySignalCard(
+    signal: CopySignalDto,
+    serverUrl: String,
+    canCopy: Boolean,
+    onCopyToFutures: () -> Unit,
+    onReject: () -> Unit
+) {
     val app = LocalContext.current.applicationContext as CopyTradeApp
     val imageLoader = remember { coil.ImageLoader.Builder(app).okHttpClient { buildAuthenticatedHttpClient(app.settingsRepository) }.build() }
     val imageUrl = "${serverUrl.trimEnd('/')}/copy-signals/${signal.id}/image"
@@ -147,28 +162,27 @@ private fun CopySignalCard(signal: CopySignalDto, serverUrl: String, onApprove: 
                 )
             }
 
+            // Copying to Futures never executes — it hands the signal's params to
+            // the Futures form where the user sets size/risk and places the order.
+            Text(
+                text = Strings.copyToFuturesHint.resolve(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
             Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onReject, modifier = Modifier.fillMaxWidth().weight(1f)) {
                     Text(Strings.reject.resolve(), color = LossRed)
                 }
-                Button(onClick = { showApproveConfirm = true }, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    Text(Strings.approve.resolve())
+                Button(
+                    onClick = onCopyToFutures,
+                    enabled = canCopy,
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                ) {
+                    Text(Strings.copyToFutures.resolve())
                 }
             }
         }
-    }
-
-    if (showApproveConfirm) {
-        ConfirmDialog(
-            title = Strings.approveConfirmTitle,
-            message = Strings.approveConfirmMessage,
-            confirmLabel = Strings.confirm,
-            cancelLabel = Strings.cancel,
-            onConfirm = {
-                showApproveConfirm = false
-                onApprove()
-            },
-            onDismiss = { showApproveConfirm = false }
-        )
     }
 }

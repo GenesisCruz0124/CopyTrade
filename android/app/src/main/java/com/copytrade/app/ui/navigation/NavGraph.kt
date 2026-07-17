@@ -54,7 +54,12 @@ fun CopyTradeNavGraph(startDestination: String) {
             ActivityScreen(onBack = { navController.popBackStack() })
         }
         composable(Screen.CopySignals.route) {
-            CopySignalsScreen(onBack = { navController.popBackStack() })
+            CopySignalsScreen(
+                onBack = { navController.popBackStack() },
+                // Approving a valid signal stores a Futures prefill, then this
+                // navigates to the pre-populated Futures form.
+                onOpenFutures = { navController.navigate(Screen.Futures.route) }
+            )
         }
         composable(Screen.Signals.route) {
             SignalsScreen(
