@@ -72,7 +72,9 @@ export class FuturesPendingOrderManager {
     private readonly futuresClient: FuturesExchangeClient,
     private readonly safety: SafetyRails,
     private readonly positions: FuturesPositionManager,
-    private readonly maxLeverage: number = 20
+    private readonly maxLeverage: number = 20,
+    /** See FuturesPositionManager's userId param — same scoping rationale. */
+    private readonly userId: string | null = null
   ) {}
 
   async openLimit(input: OpenLimitOrderInput): Promise<FuturesPendingOrderRow> {
@@ -203,25 +205,29 @@ export class FuturesPendingOrderManager {
            (id, symbol, side, leverage, open_type, limit_price, quantity, contract_size, sizing_mode,
             sizing_usd_amount, sizing_percent, margin_usdt, take_profit_percent, stop_loss_percent, risk_usdt,
             taker_fee_rate, order_id, external_oid, status, filled_quantity, filled_price, filled_at,
-            position_id, cancel_reason, last_checked_at, last_check_error, created_at, updated_at)
+            position_id, cancel_reason, last_checked_at, last_check_error, user_id, created_at, updated_at)
          VALUES (@id, @symbol, @side, @leverage, @open_type, @limit_price, @quantity, @contract_size, @sizing_mode,
                  @sizing_usd_amount, @sizing_percent, @margin_usdt, @take_profit_percent, @stop_loss_percent, @risk_usdt,
                  @taker_fee_rate, @order_id, @external_oid, @status, @filled_quantity, @filled_price, @filled_at,
-                 @position_id, @cancel_reason, @last_checked_at, @last_check_error, @created_at, @updated_at)`
+                 @position_id, @cancel_reason, @last_checked_at, @last_check_error, @user_id, @created_at, @updated_at)`
       )
-      .run(row);
+      .run({ ...row, user_id: this.userId });
   }
 
   listPending(): FuturesPendingOrderRow[] {
     return this.db
-      .prepare(`SELECT * FROM futures_pending_orders WHERE status IN ('pending', 'partially_filled') ORDER BY created_at DESC`)
-      .all() as FuturesPendingOrderRow[];
+      .prepare(
+        `SELECT * FROM futures_pending_orders WHERE status IN ('pending', 'partially_filled') AND user_id IS ? ORDER BY created_at DESC`
+      )
+      .all(this.userId) as FuturesPendingOrderRow[];
   }
 
   listHistory(limit = 100): FuturesPendingOrderRow[] {
     return this.db
-      .prepare(`SELECT * FROM futures_pending_orders WHERE status IN ('filled', 'canceled', 'failed') ORDER BY updated_at DESC LIMIT ?`)
-      .all(limit) as FuturesPendingOrderRow[];
+      .prepare(
+        `SELECT * FROM futures_pending_orders WHERE status IN ('filled', 'canceled', 'failed') AND user_id IS ? ORDER BY updated_at DESC LIMIT ?`
+      )
+      .all(this.userId, limit) as FuturesPendingOrderRow[];
   }
 
   async cancelPending(id: string): Promise<FuturesPendingOrderRow> {
@@ -370,6 +376,8 @@ export class FuturesPendingOrderManager {
   }
 
   private getRow(id: string): FuturesPendingOrderRow | undefined {
-    return this.db.prepare(`SELECT * FROM futures_pending_orders WHERE id = ?`).get(id) as FuturesPendingOrderRow | undefined;
+    return this.db.prepare(`SELECT * FROM futures_pending_orders WHERE id = ? AND user_id IS ?`).get(id, this.userId) as
+      | FuturesPendingOrderRow
+      | undefined;
   }
 }
