@@ -114,9 +114,16 @@ private fun AuthForm(
         modifier = Modifier.fillMaxWidth()
     )
 
-    if (authState is AuthState.Failure) {
+    val authStateSnapshot = authState
+    if (authStateSnapshot is AuthState.Failure) {
         Text(
-            text = (authState as AuthState.Failure).message,
+            text = authStateSnapshot.message,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    } else if (authStateSnapshot is AuthState.InsecureUrl) {
+        Text(
+            text = Strings.httpsRequired.resolve(),
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(top = 8.dp)
         )
@@ -157,7 +164,8 @@ private fun TokenForm(viewModel: SetupViewModel, serverUrl: String, onConnected:
         when (testState) {
             is ConnectionTestState.Testing -> CircularProgressIndicator(modifier = Modifier.padding(4.dp))
             is ConnectionTestState.Success -> Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = ProfitGreen)
-            is ConnectionTestState.Failure -> Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            is ConnectionTestState.Failure, is ConnectionTestState.InsecureUrl ->
+                Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
             else -> {}
         }
         Text(text = "  " + Strings.testConnection.resolve())
@@ -172,6 +180,12 @@ private fun TokenForm(viewModel: SetupViewModel, serverUrl: String, onConnected:
     } else if (testState is ConnectionTestState.Failure) {
         Text(
             text = Strings.connectionFailed.resolve(),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    } else if (testState is ConnectionTestState.InsecureUrl) {
+        Text(
+            text = Strings.httpsRequired.resolve(),
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(top = 8.dp)
         )

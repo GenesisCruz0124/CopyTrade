@@ -90,6 +90,21 @@ describe("multi-tenant server routes", () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it("rate limits repeated login attempts from the same client", async () => {
+    const attempt = () =>
+      app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "nobody@example.com", password: "wrong-password" }
+      });
+    for (let i = 0; i < 10; i++) {
+      const res = await attempt();
+      expect(res.statusCode).toBe(401); // wrong credentials, but not yet rate-limited
+    }
+    const limited = await attempt();
+    expect(limited.statusCode).toBe(429);
+  });
+
   it("accepts the legacy admin token and returns the graceful empty-futures default", async () => {
     const res = await app.inject({
       method: "GET",

@@ -49,6 +49,7 @@
 | `COPY_TRADING_RISK_PCT_PER_TRADE` | no | `2` | % of the budget risked as margin per approved signal |
 | `COPY_TRADING_DEFAULT_LEVERAGE` | no | `3` | Used when a signal's leverage couldn't be read from the image |
 | `COPY_TRADING_MARGIN_MODE` | no | `isolated` | `isolated` or `cross` |
+| `CREDENTIALS_ENCRYPTION_KEY` | for multi-user accounts | — | Encrypts per-user MEXC keys at rest; required once any user saves keys via `PUT /me/exchange-keys` |
 
 Copy `.env.example` to `.env` and fill in the values.
 
@@ -73,9 +74,40 @@ curl -X POST -H "Authorization: Bearer $API_AUTH_TOKEN" http://localhost:8080/ki
 
 Futures positions are not touched by the kill switch in this v1 — close them manually on MEXC if needed.
 
+## Multi-user accounts
+
+The engine also supports multiple people trading through one shared instance,
+each with their own login, their own MEXC keys, and their own paper/live mode
+— this is what the Android app's Sign up / Log in flow and Settings ->
+Trading account screen use. `POST /auth/register` and `POST /auth/login`
+return a per-user `apiToken`; every other endpoint accepts either that token
+or the original `API_AUTH_TOKEN` (which keeps acting as an unscoped
+admin/legacy credential — existing single-tenant deployments need no changes).
+A per-user token currently scopes **futures manual trading** (balance,
+positions, pending orders) to that user's own saved keys/mode; bots and the
+Discord copy-trading pipeline still run on the engine-wide config above.
+
+Set `CREDENTIALS_ENCRYPTION_KEY` in `.env` before anyone saves MEXC keys via
+`PUT /me/exchange-keys` — it's the key used to encrypt them at rest
+(AES-256-GCM). Leave it unset if you're not using multi-user accounts.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/auth/register` | `{email, password}` -> create an account, returns the new user + `apiToken` |
+| POST | `/auth/login` | `{email, password}` -> returns the user + `apiToken` |
+| GET | `/me` | Current user (404 if using the legacy/admin token) |
+| PUT | `/me/exchange-keys` | `{mexcApiKey?, mexcApiSecret?, mexcFuturesAccessKey?, mexcFuturesSecretKey?}` — omit a field to leave it unchanged |
+| PUT | `/me/trading-mode` | `{tradingMode?, futuresTradingMode?}`, each `"paper"` or `"live"` — switching futures to live requires futures keys already saved |
+
+Both auth endpoints are rate-limited (10 attempts / 5 minutes per client IP)
+against brute-forcing and signup flooding. If you're behind a reverse proxy
+(see [Deploying](#deploying) below), the engine trusts its `X-Forwarded-For`
+to identify the real client — don't expose the engine's port directly to the
+internet alongside a proxy, or that header becomes spoofable.
+
 ## Control API
 
-All endpoints require `Authorization: Bearer $API_AUTH_TOKEN`. Every JSON response includes `"mode": "paper" | "live"`.
+All endpoints require `Authorization: Bearer $API_AUTH_TOKEN` (or a per-user `apiToken` from `/auth/login` — see [Multi-user accounts](#multi-user-accounts) above). Every JSON response includes `"mode": "paper" | "live"`.
 
 | Method | Path | Description |
 |---|---|---|
@@ -141,6 +173,40 @@ This is a **review-then-execute** pipeline, never fully automatic:
 
 ## Deploying
 
+### HTTPS is required if more than one person will use this engine
+
+Multi-user accounts store a login password (hashed) and, once a user saves
+MEXC keys, transmit them over this connection on every login/key-update — all
+of that is plaintext on the wire over `http://`. **The Android release build
+refuses cleartext HTTP entirely** (`usesCleartextTraffic="false"`), so a
+multi-tenant deployment reachable only over `http://` won't even let users
+connect from the app.
+
+The engine itself does not terminate TLS — put a reverse proxy in front of it
+that does. [Caddy](https://caddyserver.com/) is the simplest option (automatic
+Let's Encrypt certs, ~5 lines of config) if you own a domain pointed at the
+VPS:
+
+```
+# /etc/caddy/Caddyfile
+engine.yourdomain.com {
+    reverse_proxy localhost:8080
+}
+```
+
+`caddy reload` picks that up, and `https://engine.yourdomain.com` is then
+what you put in the Android app's Server URL field. nginx + certbot or a
+platform's built-in TLS (Railway, Fly.io, etc.) work just as well — the
+requirement is only that whatever's public-facing terminates TLS.
+
+If you're the only user and you connect exclusively over a VPN/Tailscale/local
+network you already trust, plain `http://` is fine — that's still how
+`TRADING_MODE`/`FUTURES_TRADING_MODE` single-tenant setups have always worked,
+and the engine keeps accepting cleartext connections itself (the restriction
+is enforced client-side, in the Android release build only — debug builds and
+non-Android clients aren't affected). The point is: don't put a real HTTP
+server open to the public internet in front of this without TLS.
+
 ### Docker / docker-compose (any VPS)
 
 ```bash
@@ -148,14 +214,16 @@ cp .env.example .env   # edit values
 docker compose up -d --build
 ```
 
-Data persists in the `copytrade-data` named volume (SQLite, WAL mode).
+Data persists in the `copytrade-data` named volume (SQLite, WAL mode). Put a
+reverse proxy (see above) in front of port 8080 if this will be reachable
+from the public internet.
 
 ### Railway
 
 1. Create a new Railway project from this repo, root directory `engine/`.
 2. Railway auto-detects the `Dockerfile`. Set the environment variables from the table above in the Railway dashboard.
 3. Attach a volume mounted at `/app/data` so the SQLite database and downloaded signal images survive redeploys.
-4. Deploy. The control API will be reachable at the Railway-assigned domain on the port Railway routes to `$PORT`.
+4. Deploy. The control API will be reachable at the Railway-assigned domain on the port Railway routes to `$PORT` — Railway terminates TLS for you, so the assigned domain is already `https://`.
 
 ### Generic VPS (no Docker)
 
@@ -167,7 +235,7 @@ cp .env.example .env   # edit values
 npm start
 ```
 
-Run it under a process manager (systemd, pm2) so it restarts automatically. Orders are idempotent via client order IDs persisted in SQLite, so a restart never duplicates an order — in-flight orders are reconciled via `queryOrder` rather than blindly retried.
+Run it under a process manager (systemd, pm2) so it restarts automatically. Orders are idempotent via client order IDs persisted in SQLite, so a restart never duplicates an order — in-flight orders are reconciled via `queryOrder` rather than blindly retried. Put a reverse proxy (see above) in front of it for TLS.
 
 ## Architecture notes
 

@@ -39,6 +39,10 @@ object Strings {
         "Creates your own account on this engine — your trades stay separate from everyone else's.",
         "Gagawa ng sarili mong account sa engine na ito — hiwalay ang mga trade mo sa iba."
     )
+    val httpsRequired = Bi(
+        "Server URL must start with https:// — your password and MEXC keys travel over this connection.",
+        "Dapat magsimula sa https:// ang Server URL — dumadaan dito ang password at MEXC keys mo."
+    )
 
     // Dashboard
     val dashboardTitle = Bi("Dashboard", "Dashboard")
