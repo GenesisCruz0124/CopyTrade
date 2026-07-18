@@ -673,8 +673,14 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
       reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });
       return;
     }
-    const user = updateExchangeKeys(deps.db, req.userRow.id, parsed.data);
-    reply.send({ user: toPublicUser(user) });
+    try {
+      const user = updateExchangeKeys(deps.db, req.userRow.id, parsed.data);
+      reply.send({ user: toPublicUser(user) });
+    } catch (err) {
+      // Most commonly CREDENTIALS_ENCRYPTION_KEY not set on this engine yet —
+      // surface that clearly instead of a bare 500 with no explanation.
+      reply.code(400).send({ error: String(err instanceof Error ? err.message : err) });
+    }
   });
 
   const tradingModeSchema = z.object({
