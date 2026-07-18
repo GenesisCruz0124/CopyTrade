@@ -14,6 +14,23 @@ import type { FuturesDeps } from "../botManager.js";
 import type { FuturesPositionManager, OpenPositionInput } from "../mexcFutures/futuresPositionManager.js";
 import type { FuturesPendingOrderManager } from "../mexcFutures/futuresPendingOrderManager.js";
 import { z } from "zod";
+import {
+  authenticateUser,
+  EmailAlreadyRegisteredError,
+  getUserByApiToken,
+  InvalidCredentialsError,
+  registerUser,
+  toPublicUser,
+  updateExchangeKeys,
+  updateTradingMode,
+  type UserRow
+} from "../auth/userService.js";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    userRow?: UserRow;
+  }
+}
 
 export interface ApiServerDeps {
   db: Database.Database;
@@ -90,12 +107,24 @@ function futuresModeOf(): "paper" | "live" {
 export function buildServer(deps: ApiServerDeps): FastifyInstance {
   const app = Fastify({ logger: false, disableRequestLogging: true });
 
+  const AUTH_EXEMPT_PATHS = new Set(["/auth/register", "/auth/login"]);
+
   app.addHook("onRequest", async (req, reply) => {
+    const path = req.url.split("?")[0];
+    if (AUTH_EXEMPT_PATHS.has(path)) return;
+
     const authHeader = req.headers.authorization ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
-    if (token !== env.API_AUTH_TOKEN) {
-      reply.code(401).send({ error: "unauthorized" });
+    if (token === env.API_AUTH_TOKEN) {
+      // Legacy/admin token: full unscoped access, no user attached.
+      return;
     }
+    const user = token ? getUserByApiToken(deps.db, token) : null;
+    if (!user) {
+      reply.code(401).send({ error: "unauthorized" });
+      return;
+    }
+    req.userRow = user;
   });
 
   app.get("/status", async (_req, reply) => {
@@ -483,6 +512,95 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     } catch (err) {
       reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
     }
+  });
+
+  const credentialsSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(8, "password must be at least 8 characters")
+  });
+
+  app.post("/auth/register", async (req, reply) => {
+    const parsed = credentialsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      const user = registerUser(deps.db, parsed.data.email, parsed.data.password);
+      reply.code(201).send({ user: toPublicUser(user) });
+    } catch (err) {
+      if (err instanceof EmailAlreadyRegisteredError) {
+        reply.code(409).send({ error: err.message });
+        return;
+      }
+      reply.code(500).send({ error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
+  app.post("/auth/login", async (req, reply) => {
+    const parsed = credentialsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      const user = authenticateUser(deps.db, parsed.data.email, parsed.data.password);
+      reply.send({ user: toPublicUser(user) });
+    } catch (err) {
+      if (err instanceof InvalidCredentialsError) {
+        reply.code(401).send({ error: err.message });
+        return;
+      }
+      reply.code(500).send({ error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
+  app.get("/me", async (req, reply) => {
+    if (!req.userRow) {
+      reply.code(404).send({ error: "not a per-user session (using legacy/admin token)" });
+      return;
+    }
+    reply.send({ user: toPublicUser(req.userRow) });
+  });
+
+  const exchangeKeysSchema = z.object({
+    mexcApiKey: z.string().nullable().optional(),
+    mexcApiSecret: z.string().nullable().optional(),
+    mexcFuturesAccessKey: z.string().nullable().optional(),
+    mexcFuturesSecretKey: z.string().nullable().optional()
+  });
+
+  app.put("/me/exchange-keys", async (req, reply) => {
+    if (!req.userRow) {
+      reply.code(404).send({ error: "not a per-user session (using legacy/admin token)" });
+      return;
+    }
+    const parsed = exchangeKeysSchema.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });
+      return;
+    }
+    const user = updateExchangeKeys(deps.db, req.userRow.id, parsed.data);
+    reply.send({ user: toPublicUser(user) });
+  });
+
+  const tradingModeSchema = z.object({
+    tradingMode: z.enum(["paper", "live"]).optional(),
+    futuresTradingMode: z.enum(["paper", "live"]).optional()
+  });
+
+  app.put("/me/trading-mode", async (req, reply) => {
+    if (!req.userRow) {
+      reply.code(404).send({ error: "not a per-user session (using legacy/admin token)" });
+      return;
+    }
+    const parsed = tradingModeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });
+      return;
+    }
+    const user = updateTradingMode(deps.db, req.userRow.id, parsed.data);
+    reply.send({ user: toPublicUser(user) });
   });
 
   return app;
