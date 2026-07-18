@@ -4,6 +4,7 @@ import { logger } from "../logger.js";
 import type { ExtractedSignal } from "../vision/signalExtractor.js";
 import type { FuturesTradingService } from "../mexcFutures/FuturesTradingService.js";
 import type { FuturesExchangeClient } from "../mexcFutures/futuresExchangeClient.js";
+import { normalizeFuturesSymbol } from "../mexcFutures/futuresSymbol.js";
 
 export interface CopySignalRow {
   id: string;
@@ -91,7 +92,7 @@ export class CopySignalService {
         id,
         channel_message_id: params.channelMessageId,
         image_path: params.imagePath,
-        symbol: params.extraction.symbol,
+        symbol: params.extraction.symbol ? normalizeFuturesSymbol(params.extraction.symbol) : null,
         side: params.extraction.side,
         leverage: params.extraction.leverage,
         entry_price: params.extraction.entryPrice,
@@ -130,12 +131,22 @@ export class CopySignalService {
         results.push({ ...row, current_price: null, price_check: "unknown", price_note: null });
         continue;
       }
+      // Defensive normalize so signals stored before symbol normalization
+      // (or from other sources) resolve to a valid MEXC contract, and so the app
+      // shows/copies the canonical BASE_USDT symbol.
+      const contractSymbol = normalizeFuturesSymbol(row.symbol);
       try {
-        const ticker = await this.futuresClient.ticker(row.symbol);
-        results.push({ ...row, current_price: ticker.fairPrice, ...this.evaluatePriceCheck(row, ticker.fairPrice) });
+        const ticker = await this.futuresClient.ticker(contractSymbol);
+        results.push({
+          ...row,
+          symbol: contractSymbol,
+          current_price: ticker.fairPrice,
+          ...this.evaluatePriceCheck(row, ticker.fairPrice)
+        });
       } catch (err) {
         results.push({
           ...row,
+          symbol: contractSymbol,
           current_price: null,
           price_check: "unknown",
           price_note: `failed to fetch live price: ${err instanceof Error ? err.message : String(err)}`
@@ -193,12 +204,13 @@ export class CopySignalService {
       // stale one into a LIMIT order — size against the current live price instead
       // and place a market order, matching what the signal actually called for.
       const orderType: "LIMIT" | "MARKET" = row.entry_price != null ? "LIMIT" : "MARKET";
-      const entryPrice = row.entry_price ?? (await this.futuresClient.ticker(row.symbol)).fairPrice;
+      const contractSymbol = normalizeFuturesSymbol(row.symbol);
+      const entryPrice = row.entry_price ?? (await this.futuresClient.ticker(contractSymbol)).fairPrice;
       const quantity = notional / entryPrice;
 
       const result = await this.futuresTrading.placeOrder({
         botId: this.config.botId,
-        symbol: row.symbol,
+        symbol: contractSymbol,
         positionType: row.side,
         action: "open",
         leverage,
