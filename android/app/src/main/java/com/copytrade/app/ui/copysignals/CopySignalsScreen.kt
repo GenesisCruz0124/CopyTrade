@@ -101,9 +101,15 @@ fun CopySignalsList(onOpenFutures: () -> Unit, modifier: Modifier = Modifier) {
                         signal = signal,
                         serverUrl = serverUrl,
                         canCopy = viewModel.canCopyToFutures(signal),
+                        canQuickRiskTrade = viewModel.canQuickRiskTrade(signal),
                         onCopyToFutures = {
                             scope.launch {
                                 if (viewModel.prepareFuturesHandoff(signal)) onOpenFutures()
+                            }
+                        },
+                        onQuickRiskTrade = {
+                            scope.launch {
+                                if (viewModel.prepareFuturesHandoff(signal, riskUsdAmount = QUICK_RISK_TRADE_USD)) onOpenFutures()
                             }
                         },
                         onReject = { viewModel.reject(signal.id) }
@@ -136,12 +142,17 @@ private fun ValidityBadge(priceCheck: String?) {
     }
 }
 
+/** Fixed risk size for the quick "$1 risk trade" action — small enough to test a signal live at minimal cost. */
+private const val QUICK_RISK_TRADE_USD = 1.0
+
 @Composable
 private fun CopySignalCard(
     signal: CopySignalDto,
     serverUrl: String,
     canCopy: Boolean,
+    canQuickRiskTrade: Boolean,
     onCopyToFutures: () -> Unit,
+    onQuickRiskTrade: () -> Unit,
     onReject: () -> Unit
 ) {
     val app = LocalContext.current.applicationContext as CopyTradeApp
@@ -213,6 +224,16 @@ private fun CopySignalCard(
                 ) {
                     Text(Strings.copyToFutures.resolve())
                 }
+            }
+
+            // Same hand-off as "Copy to Futures", but also derives the position size
+            // so this trade risks exactly $1 if the signal's stop-loss hits.
+            OutlinedButton(
+                onClick = onQuickRiskTrade,
+                enabled = canQuickRiskTrade,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
+                Text(Strings.quickRiskTrade.resolve())
             }
         }
     }

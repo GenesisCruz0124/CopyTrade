@@ -176,6 +176,10 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 takeProfitPercent = ""
             )
         }
+        // "$1 risk trade" etc: seed the risk amount now — refreshPrice() recomputes
+        // the stop-loss % and derives the position size from it once the live
+        // price lands (recomputeFromStopLossPrice needs currentPrice, not yet set).
+        prefill.riskUsdAmount?.let { next = next.copy(riskUsdAmount = it.toPriceInput()) }
         _uiState.value = next
         // Persist symbol/side/leverage so they behave like a normal manual pick.
         app.settingsRepository.setFuturesSymbol(prefill.symbol)
