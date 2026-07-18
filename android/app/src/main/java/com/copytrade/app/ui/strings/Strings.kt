@@ -120,6 +120,7 @@ object Strings {
     val signalInvalid = Bi("Invalid", "Invalid")
     val signalNotChecked = Bi("Not checked", "Hindi pa na-check")
     val copyToFutures = Bi("Copy to Futures", "Kopyahin sa Futures")
+    val quickRiskTrade = Bi("$1 risk trade", "$1 risk trade")
     val copyToFuturesHint = Bi(
         "Opens the Futures form pre-filled — set your size/risk, then place the order.",
         "Bubuksan ang Futures form na naka-fill na — ilagay ang size/risk, tapos i-place ang order."

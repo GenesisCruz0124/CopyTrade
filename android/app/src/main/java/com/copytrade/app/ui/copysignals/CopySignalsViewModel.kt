@@ -50,13 +50,22 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
         return signal.priceCheck != "tp_hit" && signal.priceCheck != "sl_hit"
     }
 
+    /** The "$N risk trade" quick action additionally needs a stop-loss to size against. */
+    fun canQuickRiskTrade(signal: CopySignalDto): Boolean =
+        canCopyToFutures(signal) && signal.stopLoss != null
+
     /**
      * Persist the signal's parameters as a one-shot Futures prefill so the
      * Futures screen opens pre-populated. Does NOT execute anything — the user
      * sets size/risk and places the order themselves. Returns true if the
      * prefill was stored (caller then navigates to Futures).
+     *
+     * [riskUsdAmount] powers the "$N risk trade" quick action: when set (and the
+     * signal has a stop-loss), the Futures form derives the position size so the
+     * trade risks exactly that many dollars if the stop-loss hits, instead of
+     * leaving size for the user to fill in.
      */
-    suspend fun prepareFuturesHandoff(signal: CopySignalDto): Boolean {
+    suspend fun prepareFuturesHandoff(signal: CopySignalDto, riskUsdAmount: Double? = null): Boolean {
         if (!canCopyToFutures(signal)) return false
         val prefill = FuturesPrefill(
             symbol = signal.symbol!!,
@@ -64,7 +73,8 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
             leverage = signal.leverage?.toInt(),
             entryPrice = signal.entryPrice,
             stopLoss = signal.stopLoss,
-            takeProfit = signal.takeProfit
+            takeProfit = signal.takeProfit,
+            riskUsdAmount = riskUsdAmount?.takeIf { signal.stopLoss != null }
         )
         app.settingsRepository.setFuturesPrefill(prefill.toJson())
         return true
