@@ -16,6 +16,7 @@ import type { FuturesPendingOrderManager } from "../mexcFutures/futuresPendingOr
 import type { FuturesExchangeClient } from "../mexcFutures/futuresExchangeClient.js";
 import type { FuturesTradingService } from "../mexcFutures/FuturesTradingService.js";
 import type { UserFuturesRuntimeRegistry } from "../runtime/userFuturesRuntime.js";
+import { SlidingWindowRateLimiter } from "./rateLimiter.js";
 import { z } from "zod";
 import {
   authenticateUser,
@@ -168,7 +169,19 @@ function getFuturesRuntimeOrReply(deps: ApiServerDeps, req: FastifyRequest, repl
 }
 
 export function buildServer(deps: ApiServerDeps): FastifyInstance {
-  const app = Fastify({ logger: false, disableRequestLogging: true });
+  // trustProxy: this app's recommended deployment puts a reverse proxy (for TLS
+  // termination) in front of the engine on the same host/operator-controlled
+  // network, so trusting its X-Forwarded-For is safe — without it, req.ip would
+  // just be the proxy's own address and the rate limiter below would bucket
+  // every real client together.
+  const app = Fastify({ logger: false, disableRequestLogging: true, trustProxy: true });
+
+  // Auth endpoints are unauthenticated by design (that's the point), so they're
+  // the one part of the API exposed to credential-stuffing/signup-flooding from
+  // anyone who can reach it — rate limit by client IP.
+  const authRateLimiter = new SlidingWindowRateLimiter(10, 5 * 60 * 1000);
+  const sweepTimer = setInterval(() => authRateLimiter.sweep(), 5 * 60 * 1000);
+  app.addHook("onClose", async () => clearInterval(sweepTimer));
 
   const AUTH_EXEMPT_PATHS = new Set(["/auth/register", "/auth/login"]);
 
@@ -592,6 +605,10 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
   });
 
   app.post("/auth/register", async (req, reply) => {
+    if (!authRateLimiter.attempt(req.ip)) {
+      reply.code(429).send({ error: "Too many attempts — try again in a few minutes" });
+      return;
+    }
     const parsed = credentialsSchema.safeParse(req.body);
     if (!parsed.success) {
       reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });
@@ -610,6 +627,10 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
   });
 
   app.post("/auth/login", async (req, reply) => {
+    if (!authRateLimiter.attempt(req.ip)) {
+      reply.code(429).send({ error: "Too many attempts — try again in a few minutes" });
+      return;
+    }
     const parsed = credentialsSchema.safeParse(req.body);
     if (!parsed.success) {
       reply.code(400).send({ error: "invalid request", details: parsed.error.flatten() });

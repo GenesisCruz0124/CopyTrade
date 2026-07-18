@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-build-only manifest overlay. The main manifest sets
+  usesCleartextTraffic="false" (HTTPS is mandatory for release builds — MEXC
+  API secrets and passwords must never transit in plaintext). This override
+  applies only to debug builds, for local/emulator testing against a plain
+  http:// engine, and is never packaged into a release APK.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application android:usesCleartextTraffic="true" tools:replace="android:usesCleartextTraffic" />
+</manifest>

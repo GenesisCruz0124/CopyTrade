@@ -96,8 +96,16 @@ fun SettingsScreen(onBack: () -> Unit, onDisconnected: () -> Unit, onOpenAccount
                 value = state.serverUrl,
                 onValueChange = viewModel::updateServerUrl,
                 label = { Text(Strings.serverUrlLabel.resolve()) },
+                isError = state.insecureUrlError,
                 modifier = Modifier.fillMaxWidth()
             )
+            if (state.insecureUrlError) {
+                Text(
+                    text = Strings.httpsRequired.resolve(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             Divider()
 

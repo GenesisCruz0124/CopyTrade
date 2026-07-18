@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.notifications.SignalPollingService
+import com.copytrade.app.settings.isServerUrlSecure
 import com.copytrade.app.ui.strings.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,8 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val serverUrl: String = "",
     val language: AppLanguage = AppLanguage.ENGLISH,
-    val notificationsEnabled: Boolean = true
+    val notificationsEnabled: Boolean = true,
+    val insecureUrlError: Boolean = false
 )
 
 class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
@@ -46,9 +48,13 @@ class SettingsViewModel(private val app: CopyTradeApp) : ViewModel() {
     }
 
     fun updateServerUrl(url: String) {
+        if (!isServerUrlSecure(url)) {
+            _uiState.value = _uiState.value.copy(serverUrl = url, insecureUrlError = true)
+            return
+        }
         viewModelScope.launch {
             app.settingsRepository.setServerUrl(url)
-            _uiState.value = _uiState.value.copy(serverUrl = url)
+            _uiState.value = _uiState.value.copy(serverUrl = url, insecureUrlError = false)
         }
     }
 

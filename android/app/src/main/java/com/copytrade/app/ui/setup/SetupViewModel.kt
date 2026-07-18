@@ -6,6 +6,7 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.buildApiService
 import com.copytrade.app.data.remote.toUserMessage
 import com.copytrade.app.notifications.SignalPollingService
+import com.copytrade.app.settings.isServerUrlSecure
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +18,7 @@ sealed interface ConnectionTestState {
     data object Testing : ConnectionTestState
     data object Success : ConnectionTestState
     data object Failure : ConnectionTestState
+    data object InsecureUrl : ConnectionTestState
 }
 
 enum class SetupMode { LOGIN, SIGN_UP, TOKEN }
@@ -24,6 +26,7 @@ enum class SetupMode { LOGIN, SIGN_UP, TOKEN }
 sealed interface AuthState {
     data object Idle : AuthState
     data object Submitting : AuthState
+    data object InsecureUrl : AuthState
     data class Failure(val message: String) : AuthState
 }
 
@@ -74,6 +77,10 @@ class SetupViewModel(private val app: CopyTradeApp) : ViewModel() {
     }
 
     fun testConnection() {
+        if (!isServerUrlSecure(serverUrl.value)) {
+            _testState.value = ConnectionTestState.InsecureUrl
+            return
+        }
         viewModelScope.launch {
             _testState.value = ConnectionTestState.Testing
             _testState.value = try {
@@ -88,6 +95,10 @@ class SetupViewModel(private val app: CopyTradeApp) : ViewModel() {
     }
 
     fun saveAndContinue(onDone: () -> Unit) {
+        if (!isServerUrlSecure(serverUrl.value)) {
+            _testState.value = ConnectionTestState.InsecureUrl
+            return
+        }
         viewModelScope.launch {
             app.settingsRepository.setServerUrl(serverUrl.value.trim())
             app.settingsRepository.setAuthToken(token.value.trim())
@@ -97,6 +108,10 @@ class SetupViewModel(private val app: CopyTradeApp) : ViewModel() {
 
     /** Shared by log-in and sign-up: both end with a per-user apiToken saved as the bearer token. */
     fun submitAuth(onDone: () -> Unit) {
+        if (!isServerUrlSecure(serverUrl.value)) {
+            _authState.value = AuthState.InsecureUrl
+            return
+        }
         viewModelScope.launch {
             _authState.value = AuthState.Submitting
             try {
