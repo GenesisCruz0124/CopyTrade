@@ -93,6 +93,21 @@ data class FuturesUiState(
             if (margin <= 0 || lev <= 0 || slPct <= 0) return null
             return margin * lev * (slPct / 100)
         }
+
+    /**
+     * The USD you'd gain if the take-profit hits, implied by the current size,
+     * leverage, and take-profit — the profit-side mirror of [impliedRiskUsdt].
+     * gain = margin × leverage × (take-profit price move %). Null until size and
+     * a take-profit are both set.
+     */
+    val impliedProfitUsdt: Double?
+        get() {
+            val margin = impliedMarginUsdt ?: return null
+            val lev = leverage.toDoubleOrNull() ?: return null
+            val tpPct = takeProfitPercent.toDoubleOrNull() ?: return null
+            if (margin <= 0 || lev <= 0 || tpPct <= 0) return null
+            return margin * lev * (tpPct / 100)
+        }
 }
 
 class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
