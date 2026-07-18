@@ -78,6 +78,13 @@ export class BotManager {
    * manual stop/start there instead.
    */
   private restartRunningBotOnBoot(record: BotRecord, strategy: AnyStrategy): void {
+    // Bookkeeping-only rows — e.g. the copy-trading pseudo-bot CopySignalService
+    // creates purely to anchor SafetyRails budget/status checks — carry no real
+    // strategy config and were never actually running a strategy. Nothing to
+    // resume, and building one from an empty config is exactly what used to
+    // crash the whole engine on every restart once copy trading was configured.
+    if (Object.keys(record.config).length === 0) return;
+
     if (isLiveMode()) {
       logger.warn(
         { botId: record.id, type: record.type },
@@ -85,11 +92,30 @@ export class BotManager {
       );
       return;
     }
-    if (strategy instanceof GridStrategy || strategy instanceof FuturesGridStrategy) {
-      strategy.start().catch((err) => logger.error({ err, botId: record.id }, "failed to resume grid bot after restart"));
-    } else if (strategy instanceof DcaStrategy || strategy instanceof FuturesDcaStrategy) {
-      strategy.start();
+    try {
+      if (strategy instanceof GridStrategy || strategy instanceof FuturesGridStrategy) {
+        strategy.start().catch((err) => this.handleResumeFailure(record, err));
+      } else if (strategy instanceof DcaStrategy || strategy instanceof FuturesDcaStrategy) {
+        strategy.start();
+      }
+    } catch (err) {
+      this.handleResumeFailure(record, err);
     }
+  }
+
+  /** One bot's boot-time resume failing must never take down the whole engine
+   *  for everyone else — log it and pause the bot so it's visibly flagged
+   *  (via the bots list / activity feed) instead of silently re-crashing the
+   *  process on every future restart. */
+  private handleResumeFailure(record: BotRecord, err: unknown): void {
+    logger.error({ err, botId: record.id, type: record.type }, "failed to resume bot after restart; pausing it");
+    const now = Date.now();
+    this.db.prepare(`UPDATE bots SET status = 'paused', updated_at = ? WHERE id = ?`).run(now, record.id);
+    this.db
+      .prepare(`INSERT INTO events (bot_id, type, message, data, created_at) VALUES (?, 'resume_failed', ?, NULL, ?)`)
+      .run(record.id, String(err instanceof Error ? err.message : err), now);
+    const entry = this.bots.get(record.id);
+    if (entry) entry.record.status = "paused";
   }
 
   create(input: BotConfigInput): BotRecord {
