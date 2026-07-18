@@ -33,6 +33,7 @@ object Strings {
     val dashboardTitle = Bi("Dashboard", "Dashboard")
     val totalBalance = Bi("Total balance", "Kabuuang balanse")
     val futuresAvailable = Bi("Futures available", "Available sa Futures")
+    val futuresTodayPnl = Bi("Today's futures PnL", "PnL ngayong araw sa Futures")
     val activeBots = Bi("Active bots", "Mga aktibong bot")
     val noBotsYet = Bi("No bots yet. Tap + to create one.", "Wala pang bot. I-tap ang + para gumawa.")
     val killSwitch = Bi("Kill switch", "Kill switch")
