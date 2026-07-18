@@ -16,7 +16,7 @@ const EXTRACTION_PROMPT = `You are reading a trading signal screenshot (likely a
 
 Respond with ONLY a JSON object, no prose, matching exactly this shape:
 {
-  "symbol": string | null,       // trading pair in the form "BTC_USDT" (base_quote, uppercase). Null if unreadable.
+  "symbol": string | null,       // trading pair in the form "BTC_USDT" (base_quote, uppercase). Null if you cannot read it clearly.
   "side": "long" | "short" | null,
   "leverage": number | null,     // as a plain multiplier, e.g. 10 for "10x". Null if not shown.
   "entryPrice": number | null,
@@ -26,13 +26,18 @@ Respond with ONLY a JSON object, no prose, matching exactly this shape:
   "notes": string                // brief note on anything ambiguous, multiple TPs, or why confidence is low
 }
 
+Rules for "symbol":
+- Transcribe the ticker EXACTLY as it appears. Do NOT guess, autocorrect, or substitute a real coin that merely looks similar to what you see (e.g. do not turn an unclear "CROUS" into "CRO" or "CROSS").
+- Only report a symbol you can read with high confidence. If the ticker is blurry, partially cut off, low-resolution, or you are not sure you read every character correctly, set "symbol" to null, lower "confidence" to 0.3 or below, and say in "notes" what you saw and why you're unsure.
+- Include only the base asset ticker plus its quote (usually USDT); do not invent a quote if none is shown.
+
 If the image is not a trading signal at all, set all trade fields to null, confidence to 0, and explain in notes.`;
 
 const TEXT_EXTRACTION_PROMPT = `You are reading a trading signal posted as a plain-text Discord message (e.g. "Market short zec sl 559.35" or "MARKET SHORT $MET"). Extract the trade the poster is calling.
 
 Respond with ONLY a JSON object, no prose, matching exactly this shape:
 {
-  "symbol": string | null,       // trading pair in the form "BTC_USDT" (base_quote, uppercase). Null if unreadable.
+  "symbol": string | null,       // trading pair in the form "BTC_USDT" (base_quote, uppercase). Null if the ticker isn't clearly stated.
   "side": "long" | "short" | null,
   "leverage": number | null,     // as a plain multiplier, e.g. 10 for "10x". Null if not mentioned.
   "entryPrice": number | null,   // null for a "market" call with no explicit entry level
@@ -41,6 +46,11 @@ Respond with ONLY a JSON object, no prose, matching exactly this shape:
   "confidence": number,          // 0.0-1.0: how confident you are this extraction is correct and complete
   "notes": string                // brief note on anything ambiguous or why confidence is low
 }
+
+Rules for "symbol":
+- Use the ticker EXACTLY as written in the message (uppercased, with the "$" prefix removed). Do NOT autocorrect it to a different coin that looks or sounds similar, and do NOT invent a ticker that isn't in the message.
+- If no ticker is clearly present, or the "coin" looks like an ordinary word rather than a ticker, set "symbol" to null, lower "confidence" to 0.3 or below, and explain in "notes".
+- Append "_USDT" as the quote only when the message doesn't specify one.
 
 If the message is not actually a trading signal, set all trade fields to null, confidence to 0, and explain in notes.`;
 
