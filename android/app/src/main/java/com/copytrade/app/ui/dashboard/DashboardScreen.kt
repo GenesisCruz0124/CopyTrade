@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CandlestickChart
@@ -248,7 +249,22 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
     val nonZeroBalances = state.balances.filter { it.free + it.locked > 0 }
     Card(modifier = modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = Strings.totalBalance.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = Strings.totalBalance.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = Strings.accountSpotMode.resolve(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    ModeBadge(mode = state.mode)
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = state.totalValueUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
@@ -268,13 +284,18 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = Strings.futuresAvailable.resolve(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = Strings.futuresAvailable.resolve(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                        state.futuresMode?.let { fMode -> ModeBadge(mode = fMode) }
+                    }
                     Text(
                         text = String.format(Locale.US, "%.2f USDT", it),
                         style = MaterialTheme.typography.bodyMedium,

@@ -14,7 +14,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class DashboardUiState(
+    /** Spot trading mode. Not yet per-user — every account shares this global setting. */
     val mode: String = "paper",
+    /** Futures trading mode — per-user once signed in with a personal account. Null
+     *  while futures balance hasn't loaded yet (e.g. futures not configured). */
+    val futuresMode: String? = null,
     val balances: List<BalanceDto> = emptyList(),
     val totalValueUsdt: Double? = null,
     val totalValuePhp: Double? = null,
@@ -53,14 +57,15 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                 repo.refreshBots()
                 // Futures balance is a separate endpoint and may be unconfigured —
                 // treat any failure as "not available" rather than failing the refresh.
-                val futuresAvailable = runCatching { repo.getFuturesBalance().balance?.availableBalance }.getOrNull()
+                val futuresBalance = runCatching { repo.getFuturesBalance() }.getOrNull()
                 val futuresTodayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     mode = status.mode,
+                    futuresMode = futuresBalance?.mode,
                     balances = status.balances,
                     totalValueUsdt = status.totalValueUsdt,
                     totalValuePhp = status.totalValuePhp,
-                    futuresAvailableUsdt = futuresAvailable,
+                    futuresAvailableUsdt = futuresBalance?.balance?.availableBalance,
                     futuresTodayPnl = futuresTodayPnl,
                     killSwitchEngaged = status.killSwitchEngaged,
                     isRefreshing = false
