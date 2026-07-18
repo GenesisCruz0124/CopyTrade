@@ -6,6 +6,7 @@ sealed class Screen(val route: String) {
     data object CreateBot : Screen("create_bot")
     data object TradeLog : Screen("trade_log")
     data object Settings : Screen("settings")
+    data object Account : Screen("account")
     data object CopySignals : Screen("copy_signals")
     data object Signals : Screen("signals")
     data object Activity : Screen("activity")

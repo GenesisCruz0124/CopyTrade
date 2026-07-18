@@ -33,7 +33,7 @@ import com.copytrade.app.ui.theme.LossRed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onDisconnected: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onDisconnected: () -> Unit, onOpenAccount: () -> Unit) {
     val viewModel = appViewModel { SettingsViewModel(it) }
     val state by viewModel.uiState.collectAsState()
 
@@ -78,6 +78,15 @@ fun SettingsScreen(onBack: () -> Unit, onDisconnected: () -> Unit) {
             ) {
                 Text(Strings.notifyNewSignals.resolve(), modifier = Modifier.weight(1f))
                 Switch(checked = state.notificationsEnabled, onCheckedChange = viewModel::setNotificationsEnabled)
+            }
+
+            Divider()
+
+            OutlinedButton(
+                onClick = onOpenAccount,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(Strings.manageTradingAccount.resolve())
             }
 
             Divider()

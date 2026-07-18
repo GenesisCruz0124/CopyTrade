@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.copytrade.app.ui.account.AccountScreen
 import com.copytrade.app.ui.activity.ActivityScreen
 import com.copytrade.app.ui.botdetail.BotDetailScreen
 import com.copytrade.app.ui.bots.BotsScreen
@@ -115,8 +116,12 @@ fun CopyTradeNavGraph(
                     navController.navigate(Screen.Setup.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                onOpenAccount = { navController.navigate(Screen.Account.route) }
             )
+        }
+        composable(Screen.Account.route) {
+            AccountScreen(onBack = { navController.popBackStack() })
         }
     }
 }

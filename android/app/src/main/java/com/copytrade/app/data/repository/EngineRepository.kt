@@ -9,9 +9,11 @@ import com.copytrade.app.data.local.entity.EventEntity
 import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.local.entity.PnlSnapshotEntity
 import com.copytrade.app.data.remote.ApiService
+import com.copytrade.app.data.remote.dto.AuthCredentialsRequest
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
+import com.copytrade.app.data.remote.dto.ExchangeKeysRequest
 import com.copytrade.app.data.remote.dto.FuturesPendingOrderDto
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.data.remote.dto.FuturesSymbolDto
@@ -20,8 +22,11 @@ import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.data.remote.dto.StatusDto
+import com.copytrade.app.data.remote.dto.TradingModeRequest
+import com.copytrade.app.data.remote.dto.UserDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
+import retrofit2.HttpException
 
 /** Retrofit -> Room -> Flow: every refresh call fetches from the engine and writes through to the local cache. */
 class EngineRepository(
@@ -39,6 +44,21 @@ class EngineRepository(
     fun observeEvents(): Flow<List<EventEntity>> = eventDao.observeAll()
 
     suspend fun getStatus(): StatusDto = api.getStatus()
+
+    suspend fun register(email: String, password: String): UserDto = api.register(AuthCredentialsRequest(email, password)).user
+
+    suspend fun login(email: String, password: String): UserDto = api.login(AuthCredentialsRequest(email, password)).user
+
+    /** Null means "connected with the legacy/admin token" — not a per-user session, not an error. */
+    suspend fun getMe(): UserDto? = try {
+        api.getMe().user
+    } catch (e: HttpException) {
+        if (e.code() == 404) null else throw e
+    }
+
+    suspend fun updateExchangeKeys(request: ExchangeKeysRequest): UserDto = api.updateExchangeKeys(request).user
+
+    suspend fun updateTradingMode(request: TradingModeRequest): UserDto = api.updateTradingMode(request).user
 
     suspend fun refreshBots() {
         val response = api.getBots()
