@@ -41,7 +41,13 @@ const envSchema = z.object({
   SIGNAL_MONITOR_SYMBOLS: z.string().default(""),
   SIGNAL_MONITOR_INTERVAL: z.string().default("15m"),
   SIGNAL_MONITOR_MIN_CONFIDENCE: z.coerce.number().min(0).max(100).default(60),
-  SIGNAL_MONITOR_POLL_SECONDS: z.coerce.number().int().positive().default(300)
+  SIGNAL_MONITOR_POLL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  // --- Multi-user auth ---
+  // Symmetric key used to encrypt per-user exchange API keys/secrets at rest
+  // (AES-256-GCM). Required only once a user saves exchange credentials; left
+  // optional here so existing single-tenant deployments keep starting without it.
+  CREDENTIALS_ENCRYPTION_KEY: z.string().default("")
 });
 
 export type Env = z.infer<typeof envSchema>;

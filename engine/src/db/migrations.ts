@@ -2,8 +2,28 @@ import type Database from "better-sqlite3";
 
 export function runMigrations(db: Database.Database): void {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      api_token TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+      trading_mode TEXT NOT NULL DEFAULT 'paper' CHECK (trading_mode IN ('paper', 'live')),
+      futures_trading_mode TEXT NOT NULL DEFAULT 'paper' CHECK (futures_trading_mode IN ('paper', 'live')),
+      futures_paper_seed_balance_usdt REAL NOT NULL DEFAULT 50000,
+      mexc_api_key_encrypted TEXT,
+      mexc_api_secret_encrypted TEXT,
+      mexc_futures_access_key_encrypted TEXT,
+      mexc_futures_secret_key_encrypted TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_token ON users(api_token);
+
     CREATE TABLE IF NOT EXISTS bots (
       id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id),
       type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca')),
       symbol TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
@@ -63,6 +83,7 @@ export function runMigrations(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       bot_id TEXT REFERENCES bots(id),
+      user_id TEXT REFERENCES users(id),
       type TEXT NOT NULL,
       message TEXT NOT NULL,
       data TEXT,
@@ -71,6 +92,7 @@ export function runMigrations(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS copy_signals (
       id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id),
       source TEXT NOT NULL DEFAULT 'discord',
       channel_message_id TEXT,
       image_path TEXT,
@@ -91,6 +113,7 @@ export function runMigrations(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS futures_positions (
       id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id),
       symbol TEXT NOT NULL,
       side TEXT NOT NULL CHECK (side IN ('long', 'short')),
       leverage REAL NOT NULL,
@@ -117,6 +140,7 @@ export function runMigrations(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS futures_pending_orders (
       id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id),
       symbol TEXT NOT NULL,
       side TEXT NOT NULL CHECK (side IN ('long', 'short')),
       leverage REAL NOT NULL,
@@ -160,14 +184,37 @@ export function runMigrations(db: Database.Database): void {
   migrateFuturesPositionsColumn(db, "taker_fee_rate");
   migrateFuturesPositionsColumn(db, "open_fee_usdt");
   migrateFuturesPositionsColumn(db, "close_fee_usdt");
+
+  // Multi-user support: existing databases predate the `users` table and these
+  // FK columns, so backfill them via ALTER TABLE. NULL is a valid FK value in
+  // SQLite (no violation), so pre-existing rows simply stay unowned until
+  // attributed to a user.
+  addColumnIfMissing(db, "bots", "user_id", "TEXT REFERENCES users(id)");
+  addColumnIfMissing(db, "events", "user_id", "TEXT REFERENCES users(id)");
+  addColumnIfMissing(db, "copy_signals", "user_id", "TEXT REFERENCES users(id)");
+  addColumnIfMissing(db, "futures_positions", "user_id", "TEXT REFERENCES users(id)");
+  addColumnIfMissing(db, "futures_pending_orders", "user_id", "TEXT REFERENCES users(id)");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_bots_user_id ON bots(user_id);
+    CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
+    CREATE INDEX IF NOT EXISTS idx_copy_signals_user_id ON copy_signals(user_id);
+    CREATE INDEX IF NOT EXISTS idx_futures_positions_user_id ON futures_positions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_futures_pending_orders_user_id ON futures_pending_orders(user_id);
+  `);
+}
+
+/** Generic "add this column if an existing database predates it" migration —
+ *  safe for any nullable, non-CHECK'd column (plain ALTER TABLE ADD COLUMN). */
+function addColumnIfMissing(db: Database.Database, table: string, column: string, columnDdl: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (columns.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${columnDdl}`);
 }
 
 /** All of these are plain nullable REAL columns added after futures_positions already
  *  shipped — no CHECK constraint involved, so a simple ALTER TABLE covers each one. */
 function migrateFuturesPositionsColumn(db: Database.Database, column: string): void {
-  const columns = db.prepare(`PRAGMA table_info(futures_positions)`).all() as { name: string }[];
-  if (columns.some((c) => c.name === column)) return;
-  db.exec(`ALTER TABLE futures_positions ADD COLUMN ${column} REAL`);
+  addColumnIfMissing(db, "futures_positions", column, "REAL");
 }
 
 /**
