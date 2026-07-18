@@ -211,6 +211,7 @@ object Strings {
     val closeReasonStopLoss = Bi("Stop-loss hit", "Naabot ang stop-loss")
     val riskUsdAmountLabel = Bi("Risk amount (USD)", "Risk na halaga (USD)")
     val riskUsdAmountAuto = Bi("if stop-loss hits at this size", "kung tumama ang stop-loss sa size na ito")
+    val impliedProfitHint = Bi("profit if take-profit hits at this size", "kita kung tumama ang take-profit sa size na ito")
     val riskUsdAmountHintPercent = Bi(
         "Optional — how much you're willing to lose; auto-fills stop-loss %",
         "Optional — magkano ang gusto mong ma-risk; awtomatikong pupunuin ang stop-loss %"

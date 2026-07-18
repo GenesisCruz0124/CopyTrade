@@ -337,11 +337,16 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                 shape = SegmentedButtonDefaults.itemShape(1, 2)
             ) { Text(Strings.takeProfitByPrice.resolve()) }
         }
+        // Profit-side mirror of the risk read-out below: shows what this size + TP nets.
+        val profitHint: (@Composable () -> Unit)? = state.impliedProfitUsdt?.let { profit ->
+            { Text("≈ $${"%.2f".format(profit)} ${Strings.impliedProfitHint.resolve()}", color = ProfitGreen) }
+        }
         if (state.takeProfitInputMode == TpInputMode.PERCENT) {
             OutlinedTextField(
                 value = state.takeProfitPercent,
                 onValueChange = viewModel::setTakeProfitPercent,
                 label = { Text(Strings.takeProfitPercentLabel.resolve()) },
+                supportingText = profitHint,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -351,7 +356,7 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
                 onValueChange = viewModel::setTakeProfitPriceUsd,
                 label = { Text(Strings.takeProfitPriceLabel.resolve()) },
                 isError = state.takeProfitPriceError != null,
-                supportingText = state.takeProfitPriceError?.let { { Text(it, color = LossRed) } },
+                supportingText = state.takeProfitPriceError?.let { { Text(it, color = LossRed) } } ?: profitHint,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth()
             )
