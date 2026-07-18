@@ -24,14 +24,34 @@ import com.copytrade.app.data.remote.dto.PriceDto
 import com.copytrade.app.data.remote.dto.SignalResponseDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import com.copytrade.app.data.remote.dto.TradesResponseDto
+import com.copytrade.app.data.remote.dto.AuthCredentialsRequest
+import com.copytrade.app.data.remote.dto.ExchangeKeysRequest
+import com.copytrade.app.data.remote.dto.TradingModeRequest
+import com.copytrade.app.data.remote.dto.UserResponseDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface ApiService {
+    @POST("auth/register")
+    suspend fun register(@Body request: AuthCredentialsRequest): UserResponseDto
+
+    @POST("auth/login")
+    suspend fun login(@Body request: AuthCredentialsRequest): UserResponseDto
+
+    @GET("me")
+    suspend fun getMe(): UserResponseDto
+
+    @PUT("me/exchange-keys")
+    suspend fun updateExchangeKeys(@Body request: ExchangeKeysRequest): UserResponseDto
+
+    @PUT("me/trading-mode")
+    suspend fun updateTradingMode(@Body request: TradingModeRequest): UserResponseDto
+
     @GET("status")
     suspend fun getStatus(): StatusDto
 

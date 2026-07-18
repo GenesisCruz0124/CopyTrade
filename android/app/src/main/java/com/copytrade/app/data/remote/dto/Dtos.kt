@@ -377,6 +377,48 @@ data class FuturesPendingOrderResponseDto(
 )
 
 @Serializable
+data class UserDto(
+    val id: String,
+    val email: String,
+    val apiToken: String,
+    val role: String,
+    val tradingMode: String,
+    val futuresTradingMode: String,
+    val futuresPaperSeedBalanceUsdt: Double,
+    val hasSpotKeys: Boolean,
+    val hasFuturesKeys: Boolean,
+    val createdAt: Long
+)
+
+@Serializable
+data class UserResponseDto(
+    val user: UserDto
+)
+
+@Serializable
+data class AuthCredentialsRequest(
+    val email: String,
+    val password: String
+)
+
+/** Any field left at its null default is omitted from the request body (Json's
+ *  encodeDefaults is off app-wide) — the engine treats an omitted key as "leave
+ *  this key unchanged," so only fields the user actually edited get sent. */
+@Serializable
+data class ExchangeKeysRequest(
+    val mexcApiKey: String? = null,
+    val mexcApiSecret: String? = null,
+    val mexcFuturesAccessKey: String? = null,
+    val mexcFuturesSecretKey: String? = null
+)
+
+@Serializable
+data class TradingModeRequest(
+    val tradingMode: String? = null,
+    val futuresTradingMode: String? = null
+)
+
+@Serializable
 @OptIn(ExperimentalSerializationApi::class)
 data class CreateDcaBotRequest(
     @EncodeDefault val type: String = "dca",

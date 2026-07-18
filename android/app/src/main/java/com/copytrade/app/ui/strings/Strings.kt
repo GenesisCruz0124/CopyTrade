@@ -28,6 +28,17 @@ object Strings {
     val connectAndContinue = Bi("Connect & continue", "Kumonekta at magpatuloy")
     val connectionSuccess = Bi("Connected successfully", "Successful ang koneksyon")
     val connectionFailed = Bi("Could not connect. Check the URL and token.", "Hindi ma-connect. I-check ang URL at token.")
+    val setupModeLogin = Bi("Log in", "Mag-login")
+    val setupModeSignUp = Bi("Sign up", "Mag-sign up")
+    val setupModeToken = Bi("Admin token", "Admin token")
+    val emailLabel = Bi("Email", "Email")
+    val passwordLabel = Bi("Password", "Password")
+    val logIn = Bi("Log in", "Mag-login")
+    val signUp = Bi("Sign up", "Mag-sign up")
+    val setupSignUpHint = Bi(
+        "Creates your own account on this engine — your trades stay separate from everyone else's.",
+        "Gagawa ng sarili mong account sa engine na ito — hiwalay ang mga trade mo sa iba."
+    )
 
     // Dashboard
     val dashboardTitle = Bi("Dashboard", "Dashboard")
@@ -101,6 +112,7 @@ object Strings {
         "Kinokontrol ng CopyTrade ang sarili mong MEXC Spot grid/DCA engine. Walang analytics, walang tracker."
     )
     val logout = Bi("Disconnect", "Idiskonekta")
+    val manageTradingAccount = Bi("Trading account", "Trading account")
 
     // Notifications
     val notificationsSection = Bi("Notifications", "Mga Notification")
@@ -240,6 +252,39 @@ object Strings {
     val cancelOrder = Bi("Cancel order", "Kanselahin ang order")
     val pendingStatusLabel = Bi("Status", "Status")
     val filledLabel = Bi("Filled", "Napuno")
+
+    // Trading account (per-user keys + paper/live mode)
+    val accountTitle = Bi("Trading account", "Trading account")
+    val accountNotPerUser = Bi(
+        "This app is connected with an admin/shared token — personal account settings don't apply here.",
+        "Naka-connect ang app na ito gamit ang admin/shared token — hindi applicable dito ang personal account settings."
+    )
+    val accountEmailLabel = Bi("Signed in as", "Naka-sign in bilang")
+    val accountModeSection = Bi("Trading mode", "Trading mode")
+    val accountSpotMode = Bi("Spot", "Spot")
+    val accountFuturesMode = Bi("Futures", "Futures")
+    val accountModePaper = Bi("Paper", "Paper")
+    val accountModeLive = Bi("Live", "Live")
+    val accountLiveConfirmTitle = Bi("Switch to live trading?", "Lumipat sa live trading?")
+    val accountLiveConfirmMessage = Bi(
+        "Live mode uses your saved MEXC keys to place real orders with real funds.",
+        "Gagamit ang live mode ng saved MEXC keys mo para maglagay ng totoong order gamit ang totoong pera."
+    )
+    val accountKeysSection = Bi("MEXC API keys", "MEXC API keys")
+    val accountKeysHint = Bi(
+        "Keys are encrypted before being stored. Leave a field blank to keep its current value.",
+        "Naka-encrypt ang mga key bago i-save. Iwanang blangko ang field para hindi ito baguhin."
+    )
+    val accountSpotKeysLabel = Bi("Spot keys", "Spot keys")
+    val accountFuturesKeysLabel = Bi("Futures keys", "Futures keys")
+    val accountKeysSaved = Bi("Saved", "Naka-save na")
+    val accountKeysNotSaved = Bi("Not saved", "Hindi pa naka-save")
+    val accountApiKeyLabel = Bi("API key", "API key")
+    val accountApiSecretLabel = Bi("API secret", "API secret")
+    val accountFuturesAccessKeyLabel = Bi("Futures access key", "Futures access key")
+    val accountFuturesSecretKeyLabel = Bi("Futures secret key", "Futures secret key")
+    val accountSaveKeys = Bi("Save keys", "I-save ang keys")
+    val accountKeysSavedToast = Bi("Keys saved", "Na-save ang keys")
 }
 
 @Composable
