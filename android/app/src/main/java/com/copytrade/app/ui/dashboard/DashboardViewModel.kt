@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.BotEntity
 import com.copytrade.app.data.remote.dto.BalanceDto
+import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +19,7 @@ data class DashboardUiState(
     val totalValueUsdt: Double? = null,
     val totalValuePhp: Double? = null,
     val futuresAvailableUsdt: Double? = null,
+    val futuresTodayPnl: FuturesTodayPnlDto? = null,
     val bots: List<BotEntity> = emptyList(),
     val isRefreshing: Boolean = false,
     val killSwitchEngaged: Boolean = false,
@@ -52,12 +54,14 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                 // Futures balance is a separate endpoint and may be unconfigured —
                 // treat any failure as "not available" rather than failing the refresh.
                 val futuresAvailable = runCatching { repo.getFuturesBalance().balance?.availableBalance }.getOrNull()
+                val futuresTodayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     mode = status.mode,
                     balances = status.balances,
                     totalValueUsdt = status.totalValueUsdt,
                     totalValuePhp = status.totalValuePhp,
                     futuresAvailableUsdt = futuresAvailable,
+                    futuresTodayPnl = futuresTodayPnl,
                     killSwitchEngaged = status.killSwitchEngaged,
                     isRefreshing = false
                 )

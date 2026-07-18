@@ -64,6 +64,7 @@ import com.copytrade.app.ui.futures.PositionCard
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
+import com.copytrade.app.ui.theme.ProfitGreen
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -279,6 +280,27 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+                state.futuresTodayPnl?.let { pnl ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = Strings.futuresTodayPnl.resolve(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        val pnlColor = if (pnl.realizedPnlUsdt >= 0) ProfitGreen else LossRed
+                        val sign = if (pnl.realizedPnlUsdt >= 0) "+" else ""
+                        val percentText = pnl.realizedPnlPercent?.let { String.format(Locale.US, " (%s%.2f%%)", sign, it) } ?: ""
+                        Text(
+                            text = String.format(Locale.US, "%s%.2f USDT%s", sign, pnl.realizedPnlUsdt, percentText),
+                            color = pnlColor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
