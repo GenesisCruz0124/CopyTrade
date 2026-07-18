@@ -53,14 +53,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CopySignalsScreen(onBack: () -> Unit, onOpenFutures: () -> Unit) {
-    val viewModel = appViewModel { CopySignalsViewModel(it) }
-    val state by viewModel.uiState.collectAsState()
-    val app = LocalContext.current.applicationContext as CopyTradeApp
-    val serverUrl = remember { runBlocking { app.settingsRepository.serverUrl.first() } ?: "" }
-    val scope = rememberCoroutineScope()
-
-    PollWhileForeground { viewModel.refresh() }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -71,33 +63,51 @@ fun CopySignalsScreen(onBack: () -> Unit, onOpenFutures: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            state.error?.let {
-                Text(it, color = LossRed, modifier = Modifier.padding(16.dp))
+        CopySignalsList(onOpenFutures = onOpenFutures, modifier = Modifier.padding(padding))
+    }
+}
+
+/**
+ * The pending copy-signals list — extracted so it can be shown both on its own
+ * screen and embedded as a tab on the dashboard. Polls for new signals while
+ * in the foreground and hands an approved signal off to the Futures form.
+ */
+@Composable
+fun CopySignalsList(onOpenFutures: () -> Unit, modifier: Modifier = Modifier) {
+    val viewModel = appViewModel { CopySignalsViewModel(it) }
+    val state by viewModel.uiState.collectAsState()
+    val app = LocalContext.current.applicationContext as CopyTradeApp
+    val serverUrl = remember { runBlocking { app.settingsRepository.serverUrl.first() } ?: "" }
+    val scope = rememberCoroutineScope()
+
+    PollWhileForeground { viewModel.refresh() }
+
+    Column(modifier = modifier) {
+        state.error?.let {
+            Text(it, color = LossRed, modifier = Modifier.padding(16.dp))
+        }
+        if (state.signals.isEmpty()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(Strings.noPendingSignals.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (state.signals.isEmpty()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(Strings.noPendingSignals.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(state.signals, key = { it.id }) { signal ->
-                        CopySignalCard(
-                            signal = signal,
-                            serverUrl = serverUrl,
-                            canCopy = viewModel.canCopyToFutures(signal),
-                            onCopyToFutures = {
-                                scope.launch {
-                                    if (viewModel.prepareFuturesHandoff(signal)) onOpenFutures()
-                                }
-                            },
-                            onReject = { viewModel.reject(signal.id) }
-                        )
-                    }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(state.signals, key = { it.id }) { signal ->
+                    CopySignalCard(
+                        signal = signal,
+                        serverUrl = serverUrl,
+                        canCopy = viewModel.canCopyToFutures(signal),
+                        onCopyToFutures = {
+                            scope.launch {
+                                if (viewModel.prepareFuturesHandoff(signal)) onOpenFutures()
+                            }
+                        },
+                        onReject = { viewModel.reject(signal.id) }
+                    )
                 }
             }
         }

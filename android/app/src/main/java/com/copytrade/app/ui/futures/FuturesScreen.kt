@@ -392,13 +392,22 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
             onValueChange = viewModel::setRiskUsdAmount,
             label = { Text(Strings.riskUsdAmountLabel.resolve()) },
             supportingText = {
-                Text(
-                    if (state.stopLossInputMode == SlInputMode.PERCENT) {
-                        Strings.riskUsdAmountHintPercent.resolve()
-                    } else {
-                        Strings.riskUsdAmountHintPrice.resolve()
-                    }
-                )
+                val autoRisk = state.impliedRiskUsdt
+                if (state.riskUsdAmount.isBlank() && autoRisk != null) {
+                    // Reverse of the risk->size flow: show what this size + stop-loss risks.
+                    Text(
+                        "≈ $${"%.2f".format(autoRisk)} ${Strings.riskUsdAmountAuto.resolve()}",
+                        color = ProfitGreen
+                    )
+                } else {
+                    Text(
+                        if (state.stopLossInputMode == SlInputMode.PERCENT) {
+                            Strings.riskUsdAmountHintPercent.resolve()
+                        } else {
+                            Strings.riskUsdAmountHintPrice.resolve()
+                        }
+                    )
+                }
             },
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()

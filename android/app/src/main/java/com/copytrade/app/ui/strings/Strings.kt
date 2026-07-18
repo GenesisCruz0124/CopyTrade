@@ -202,6 +202,7 @@ object Strings {
     val futuresHistoryTitle = Bi("Futures history", "Futures history")
     val openTab = Bi("Open", "Bukas")
     val historyTab = Bi("History", "History")
+    val signalsTab = Bi("Signals", "Signals")
     val noPositionHistory = Bi("No closed positions yet", "Wala pang saradong position")
     val closedAtLabel = Bi("Closed", "Sarado")
     val realizedPnlLabel = Bi("Realized PnL", "Realized PnL")
@@ -209,6 +210,7 @@ object Strings {
     val closeReasonTakeProfit = Bi("Take-profit hit", "Naabot ang take-profit")
     val closeReasonStopLoss = Bi("Stop-loss hit", "Naabot ang stop-loss")
     val riskUsdAmountLabel = Bi("Risk amount (USD)", "Risk na halaga (USD)")
+    val riskUsdAmountAuto = Bi("if stop-loss hits at this size", "kung tumama ang stop-loss sa size na ito")
     val riskUsdAmountHintPercent = Bi(
         "Optional — how much you're willing to lose; auto-fills stop-loss %",
         "Optional — magkano ang gusto mong ma-risk; awtomatikong pupunuin ang stop-loss %"

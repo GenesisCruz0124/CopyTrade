@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.copytrade.app.ui.appViewModel
+import com.copytrade.app.ui.copysignals.CopySignalsList
 import com.copytrade.app.ui.components.ConfirmDialog
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
@@ -169,6 +170,7 @@ fun DashboardScreen(
                     Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text(Strings.openTab.resolve()) })
                     Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(Strings.pendingTab.resolve()) })
                     Tab(selected = tabIndex == 2, onClick = { tabIndex = 2 }, text = { Text(Strings.historyTab.resolve()) })
+                    Tab(selected = tabIndex == 3, onClick = { tabIndex = 3 }, text = { Text(Strings.signalsTab.resolve()) })
                 }
 
                 when (tabIndex) {
@@ -198,7 +200,7 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    else -> if (futuresState.closedPositions.isEmpty()) {
+                    2 -> if (futuresState.closedPositions.isEmpty()) {
                         Text(
                             Strings.noPositionHistory.resolve(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -211,6 +213,7 @@ fun DashboardScreen(
                             }
                         }
                     }
+                    else -> CopySignalsList(onOpenFutures = onOpenFutures)
                 }
             }
             PullRefreshIndicator(

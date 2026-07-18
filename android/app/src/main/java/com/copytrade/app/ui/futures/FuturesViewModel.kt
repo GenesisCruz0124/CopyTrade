@@ -78,6 +78,21 @@ data class FuturesUiState(
                 if (pct != null && bal != null) pct / 100 * bal else null
             }
         }
+
+    /**
+     * The USD you'd lose if the stop-loss hits, implied by the current size,
+     * leverage, and stop-loss — the reverse of typing a risk to derive the size.
+     * loss = margin × leverage × (stop-loss price move %). Null until size and a
+     * stop-loss are both set.
+     */
+    val impliedRiskUsdt: Double?
+        get() {
+            val margin = impliedMarginUsdt ?: return null
+            val lev = leverage.toDoubleOrNull() ?: return null
+            val slPct = stopLossPercent.toDoubleOrNull() ?: return null
+            if (margin <= 0 || lev <= 0 || slPct <= 0) return null
+            return margin * lev * (slPct / 100)
+        }
 }
 
 class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
