@@ -67,7 +67,11 @@ export class FuturesPositionManager {
     private readonly db: Database.Database,
     private readonly futuresClient: FuturesExchangeClient,
     private readonly safety: SafetyRails,
-    private readonly maxLeverage: number = 20
+    private readonly maxLeverage: number = 20,
+    /** null = legacy/unowned rows (single-tenant deployments, or the admin token).
+     *  Scopes every query so per-user runtimes sharing the main db in live mode
+     *  can never see or touch another user's positions. */
+    private readonly userId: string | null = null
   ) {}
 
   async open(input: OpenPositionInput): Promise<FuturesPositionRow> {
@@ -169,15 +173,15 @@ export class FuturesPositionManager {
       .prepare(
         `INSERT INTO futures_positions
            (id, symbol, side, leverage, open_type, entry_price, quantity, contract_size, margin_usdt,
-            take_profit_price, stop_loss_price, risk_usdt, taker_fee_rate, open_fee_usdt, status, order_id, created_at, updated_at)
+            take_profit_price, stop_loss_price, risk_usdt, taker_fee_rate, open_fee_usdt, status, order_id, user_id, created_at, updated_at)
          VALUES (@id, @symbol, @side, @leverage, @open_type, @entry_price, @quantity, @contract_size, @margin_usdt,
-                 @take_profit_price, @stop_loss_price, @risk_usdt, @taker_fee_rate, @open_fee_usdt, @status, @order_id, @created_at, @updated_at)`
+                 @take_profit_price, @stop_loss_price, @risk_usdt, @taker_fee_rate, @open_fee_usdt, @status, @order_id, @user_id, @created_at, @updated_at)`
       )
-      .run(row);
+      .run({ ...row, user_id: this.userId });
   }
 
   async close(positionId: string, reason = "manual"): Promise<FuturesPositionRow> {
-    const row = this.db.prepare(`SELECT * FROM futures_positions WHERE id = ?`).get(positionId) as
+    const row = this.db.prepare(`SELECT * FROM futures_positions WHERE id = ? AND user_id IS ?`).get(positionId, this.userId) as
       | FuturesPositionRow
       | undefined;
     if (!row) throw new Error(`position ${positionId} not found`);
@@ -223,15 +227,15 @@ export class FuturesPositionManager {
 
   async listOpen(): Promise<FuturesPositionView[]> {
     const rows = this.db
-      .prepare(`SELECT * FROM futures_positions WHERE status = 'open' ORDER BY created_at DESC`)
-      .all() as FuturesPositionRow[];
+      .prepare(`SELECT * FROM futures_positions WHERE status = 'open' AND user_id IS ? ORDER BY created_at DESC`)
+      .all(this.userId) as FuturesPositionRow[];
     return this.attachLivePnl(rows);
   }
 
   listClosed(limit = 100): FuturesPositionView[] {
     const rows = this.db
-      .prepare(`SELECT * FROM futures_positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT ?`)
-      .all(limit) as FuturesPositionRow[];
+      .prepare(`SELECT * FROM futures_positions WHERE status = 'closed' AND user_id IS ? ORDER BY closed_at DESC LIMIT ?`)
+      .all(this.userId, limit) as FuturesPositionRow[];
     return rows.map((row) => ({
       ...row,
       currentPrice: null,
@@ -270,9 +274,9 @@ export class FuturesPositionManager {
     const row = this.db
       .prepare(
         `SELECT COALESCE(SUM(realized_pnl_usdt), 0) as pnl, COALESCE(SUM(margin_usdt), 0) as margin, COUNT(*) as trades
-         FROM futures_positions WHERE status = 'closed' AND closed_at >= ?`
+         FROM futures_positions WHERE status = 'closed' AND user_id IS ? AND closed_at >= ?`
       )
-      .get(startOfDay.getTime()) as { pnl: number; margin: number; trades: number };
+      .get(this.userId, startOfDay.getTime()) as { pnl: number; margin: number; trades: number };
     return {
       realizedPnlUsdt: row.pnl,
       realizedPnlPercent: row.margin > 0 ? (row.pnl / row.margin) * 100 : null,
@@ -282,7 +286,9 @@ export class FuturesPositionManager {
 
   /** Polls open positions and auto-closes any that crossed their TP/SL price. */
   async monitor(): Promise<void> {
-    const rows = this.db.prepare(`SELECT * FROM futures_positions WHERE status = 'open'`).all() as FuturesPositionRow[];
+    const rows = this.db
+      .prepare(`SELECT * FROM futures_positions WHERE status = 'open' AND user_id IS ?`)
+      .all(this.userId) as FuturesPositionRow[];
     for (const row of rows) {
       if (row.take_profit_price == null && row.stop_loss_price == null) continue;
       try {

@@ -25,6 +25,7 @@ import { SignalExtractor } from "./vision/signalExtractor.js";
 import { CopySignalService } from "./copySignals/copySignalService.js";
 import { FxRateService } from "./fx/fxRateService.js";
 import { SignalMonitor, parseSignalMonitorSymbols } from "./analysis/signalMonitor.js";
+import { UserFuturesRuntimeRegistry } from "./runtime/userFuturesRuntime.js";
 
 async function main() {
   const db = getDb();
@@ -121,6 +122,22 @@ async function main() {
   } else {
     logger.info("FUTURES_TRADING_MODE=live but MEXC_FUTURES_ACCESS_KEY/SECRET_KEY not set — futures disabled");
   }
+
+  // Per-user futures runtime: authenticated users trade through their own
+  // saved keys/mode (see api/server.ts's resolveFuturesRuntime), independent
+  // of the legacy engine-wide futures config above. Built unconditionally —
+  // per-user paper trading works even when this engine has no global futures
+  // keys configured at all.
+  const userFuturesRuntimes = new UserFuturesRuntimeRegistry({
+    mainDb: db,
+    safety,
+    publicFuturesClient: new FuturesRestClient({
+      accessKey: env.MEXC_FUTURES_ACCESS_KEY,
+      secretKey: env.MEXC_FUTURES_SECRET_KEY
+    }),
+    maxFuturesLeverage: env.MAX_FUTURES_LEVERAGE
+  });
+  const userFuturesRuntimesTimer = userFuturesRuntimes.startBackgroundLoop();
 
   const botManager = new BotManager(
     db,
@@ -226,7 +243,8 @@ async function main() {
     fxRates,
     futures,
     futuresPositions,
-    futuresPendingOrders
+    futuresPendingOrders,
+    userFuturesRuntimes
   });
 
   const shutdown = async () => {
@@ -234,6 +252,7 @@ async function main() {
     ws.close();
     pricePoller?.stop();
     clearInterval(reconcileTimer);
+    clearInterval(userFuturesRuntimesTimer);
     if (futuresMonitorTimer) clearInterval(futuresMonitorTimer);
     if (futuresPendingOrdersTimer) clearInterval(futuresPendingOrdersTimer);
     signalMonitor?.stop();
