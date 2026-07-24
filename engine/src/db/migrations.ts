@@ -107,6 +107,7 @@ export function runMigrations(db: Database.Database): void {
       status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED')),
       order_id TEXT,
       failure_reason TEXT,
+      archived_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -194,7 +195,12 @@ export function runMigrations(db: Database.Database): void {
   addColumnIfMissing(db, "copy_signals", "user_id", "TEXT REFERENCES users(id)");
   addColumnIfMissing(db, "futures_positions", "user_id", "TEXT REFERENCES users(id)");
   addColumnIfMissing(db, "futures_pending_orders", "user_id", "TEXT REFERENCES users(id)");
+  // Archiving: hides a signal from the default feed without changing its status
+  // (unlike REJECTED, which is terminal) — archived_at is nullable, so existing
+  // databases predating this column just backfill everyone as "not archived".
+  addColumnIfMissing(db, "copy_signals", "archived_at", "INTEGER");
   db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_copy_signals_archived_at ON copy_signals(archived_at);
     CREATE INDEX IF NOT EXISTS idx_bots_user_id ON bots(user_id);
     CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
     CREATE INDEX IF NOT EXISTS idx_copy_signals_user_id ON copy_signals(user_id);

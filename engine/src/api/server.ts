@@ -546,13 +546,14 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     reply.send({ mode: modeOf(), ok: true });
   });
 
-  app.get<{ Querystring: { status?: string } }>("/copy-signals", async (req, reply) => {
+  app.get<{ Querystring: { status?: string; archived?: string } }>("/copy-signals", async (req, reply) => {
     if (!deps.copySignals) {
       reply.send({ mode: modeOf(), signals: [] });
       return;
     }
     const status = req.query.status as any;
-    reply.send({ mode: modeOf(), signals: await deps.copySignals.listWithPriceCheck(status) });
+    const archivedOnly = req.query.archived === "true";
+    reply.send({ mode: modeOf(), signals: await deps.copySignals.listWithPriceCheck(status, archivedOnly) });
   });
 
   app.get<{ Params: { id: string } }>("/copy-signals/:id/image", async (req, reply) => {
@@ -593,6 +594,32 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     }
     try {
       const signal = deps.copySignals.reject(req.params.id);
+      reply.send({ mode: modeOf(), signal });
+    } catch (err) {
+      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/copy-signals/:id/archive", async (req, reply) => {
+    if (!deps.copySignals) {
+      reply.code(400).send({ mode: modeOf(), error: "copy trading not configured" });
+      return;
+    }
+    try {
+      const signal = deps.copySignals.archive(req.params.id);
+      reply.send({ mode: modeOf(), signal });
+    } catch (err) {
+      reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/copy-signals/:id/unarchive", async (req, reply) => {
+    if (!deps.copySignals) {
+      reply.code(400).send({ mode: modeOf(), error: "copy trading not configured" });
+      return;
+    }
+    try {
+      const signal = deps.copySignals.unarchive(req.params.id);
       reply.send({ mode: modeOf(), signal });
     } catch (err) {
       reply.code(400).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });

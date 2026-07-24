@@ -15,7 +15,9 @@ import kotlinx.coroutines.launch
 data class CopySignalsUiState(
     val signals: List<CopySignalDto> = emptyList(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** false: the normal pending feed. true: only archived signals (a separate view). */
+    val showArchived: Boolean = false
 )
 
 class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
@@ -32,10 +34,41 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val repo = app.repositoryFor(url)
-                val signals = repo.getCopySignals("PENDING")
+                val showArchived = _uiState.value.showArchived
+                val signals = repo.getCopySignals("PENDING", archived = showArchived)
                 _uiState.value = _uiState.value.copy(signals = signals, isLoading = false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
+            }
+        }
+    }
+
+    fun setShowArchived(showArchived: Boolean) {
+        if (_uiState.value.showArchived == showArchived) return
+        _uiState.value = _uiState.value.copy(showArchived = showArchived)
+        refresh()
+    }
+
+    fun archive(id: String) {
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                app.repositoryFor(url).archiveCopySignal(id)
+                refresh()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
+            }
+        }
+    }
+
+    fun unarchive(id: String) {
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                app.repositoryFor(url).unarchiveCopySignal(id)
+                refresh()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }

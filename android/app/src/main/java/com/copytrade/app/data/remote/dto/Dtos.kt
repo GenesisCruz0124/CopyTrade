@@ -205,6 +205,7 @@ data class CopySignalDto(
     val status: String,
     @kotlinx.serialization.SerialName("order_id") val orderId: String? = null,
     @kotlinx.serialization.SerialName("failure_reason") val failureReason: String? = null,
+    @kotlinx.serialization.SerialName("archived_at") val archivedAt: Long? = null,
     @kotlinx.serialization.SerialName("created_at") val createdAt: Long,
     @kotlinx.serialization.SerialName("current_price") val currentPrice: Double? = null,
     @kotlinx.serialization.SerialName("price_check") val priceCheck: String? = null,
