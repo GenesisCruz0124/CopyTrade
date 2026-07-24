@@ -6,6 +6,8 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.BotEntity
 import com.copytrade.app.data.remote.dto.BalanceDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
+import com.copytrade.app.data.remote.dto.TradingModeRequest
+import com.copytrade.app.data.remote.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +21,10 @@ data class DashboardUiState(
     /** Futures trading mode — per-user once signed in with a personal account. Null
      *  while futures balance hasn't loaded yet (e.g. futures not configured). */
     val futuresMode: String? = null,
+    /** Whether the connected session can change its own futures trading mode —
+     *  true only for a per-user login (GET /me succeeds), not the legacy/admin token. */
+    val canManageFuturesMode: Boolean = false,
+    val isUpdatingFuturesMode: Boolean = false,
     val balances: List<BalanceDto> = emptyList(),
     val totalValueUsdt: Double? = null,
     val totalValuePhp: Double? = null,
@@ -59,9 +65,11 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                 // treat any failure as "not available" rather than failing the refresh.
                 val futuresBalance = runCatching { repo.getFuturesBalance() }.getOrNull()
                 val futuresTodayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
+                val currentUser = runCatching { repo.getMe() }.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     mode = status.mode,
                     futuresMode = futuresBalance?.mode,
+                    canManageFuturesMode = currentUser != null,
                     balances = status.balances,
                     totalValueUsdt = status.totalValueUsdt,
                     totalValuePhp = status.totalValuePhp,
@@ -72,6 +80,20 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isRefreshing = false, error = e.message)
+            }
+        }
+    }
+
+    fun setFuturesTradingMode(live: Boolean) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isUpdatingFuturesMode = true, error = null)
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                app.repositoryFor(url).updateTradingMode(TradingModeRequest(futuresTradingMode = if (live) "live" else "paper"))
+                _uiState.value = _uiState.value.copy(isUpdatingFuturesMode = false)
+                refresh()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isUpdatingFuturesMode = false, error = e.toUserMessage())
             }
         }
     }

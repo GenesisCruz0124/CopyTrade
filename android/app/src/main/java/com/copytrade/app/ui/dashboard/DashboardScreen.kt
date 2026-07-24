@@ -30,7 +30,6 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -85,6 +85,7 @@ fun DashboardScreen(
     val futuresViewModel = appViewModel { FuturesHistoryViewModel(it) }
     val futuresState by futuresViewModel.uiState.collectAsState()
     var showKillSwitchConfirm by remember { mutableStateOf(false) }
+    var showFuturesLiveConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var tabIndex by remember { mutableIntStateOf(0) }
 
@@ -98,7 +99,6 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text(Strings.dashboardTitle.resolve()) },
                 actions = {
-                    ModeBadge(mode = state.mode, modifier = Modifier.padding(end = 8.dp))
                     IconButton(onClick = { showKillSwitchConfirm = true }) {
                         Icon(Icons.Filled.PowerSettingsNew, contentDescription = Strings.killSwitch.resolve(), tint = LossRed)
                     }
@@ -162,8 +162,17 @@ fun DashboardScreen(
                 .pullRefresh(pullRefreshState)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                TotalBalanceCard(state, modifier = Modifier.padding(16.dp))
+                FuturesBalanceCard(
+                    state = state,
+                    onToggleFuturesLive = { live ->
+                        if (live) showFuturesLiveConfirm = true else viewModel.setFuturesTradingMode(false)
+                    },
+                    modifier = Modifier.padding(16.dp)
+                )
 
+                state.error?.let {
+                    Text(it, color = LossRed, modifier = Modifier.padding(horizontal = 16.dp))
+                }
                 futuresState.error?.let {
                     Text(it, color = LossRed, modifier = Modifier.padding(horizontal = 16.dp))
                 }
@@ -239,14 +248,33 @@ fun DashboardScreen(
             onDismiss = { showKillSwitchConfirm = false }
         )
     }
+
+    if (showFuturesLiveConfirm) {
+        ConfirmDialog(
+            title = Strings.accountLiveConfirmTitle,
+            message = Strings.accountLiveConfirmMessage,
+            confirmLabel = Strings.confirm,
+            cancelLabel = Strings.cancel,
+            onConfirm = {
+                showFuturesLiveConfirm = false
+                viewModel.setFuturesTradingMode(true)
+            },
+            onDismiss = { showFuturesLiveConfirm = false }
+        )
+    }
 }
 
-/** Fixed-point, never scientific notation — Double.toString() switches to "1.7E-4" for small crypto quantities. */
-private fun formatQty(qty: Double): String = String.format(Locale.US, "%.8f", qty).trimEnd('0').trimEnd('.')
-
+/**
+ * Futures-only by design — spot trading is still shared/global paper money
+ * (not real, not per-user, see DashboardUiState.mode kdoc), so surfacing it
+ * here just added confusing clutter next to real per-user futures balances.
+ */
 @Composable
-private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modifier) {
-    val nonZeroBalances = state.balances.filter { it.free + it.locked > 0 }
+private fun FuturesBalanceCard(
+    state: DashboardUiState,
+    onToggleFuturesLive: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(modifier = modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -254,94 +282,46 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = Strings.totalBalance.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = Strings.futuresAvailable.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = Strings.accountSpotMode.resolve(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    ModeBadge(mode = state.mode)
+                    state.futuresMode?.let { fMode -> ModeBadge(mode = fMode, modifier = Modifier.padding(end = 8.dp)) }
+                    if (state.canManageFuturesMode) {
+                        Switch(
+                            checked = state.futuresMode == "live",
+                            onCheckedChange = onToggleFuturesLive,
+                            enabled = !state.isUpdatingFuturesMode
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = state.totalValueUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
+                text = state.futuresAvailableUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
                 style = MaterialTheme.typography.headlineMedium
             )
-            state.totalValuePhp?.let {
-                Text(
-                    text = String.format(Locale.US, "≈ ₱%.2f", it),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
 
-            state.futuresAvailableUsdt?.let {
-                Spacer(Modifier.height(12.dp))
-                Divider()
+            state.futuresTodayPnl?.let { pnl ->
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = Strings.futuresAvailable.resolve(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(end = 6.dp)
-                        )
-                        state.futuresMode?.let { fMode -> ModeBadge(mode = fMode) }
-                    }
                     Text(
-                        text = String.format(Locale.US, "%.2f USDT", it),
+                        text = Strings.futuresTodayPnl.resolve(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    val pnlColor = if (pnl.realizedPnlUsdt >= 0) ProfitGreen else LossRed
+                    val sign = if (pnl.realizedPnlUsdt >= 0) "+" else ""
+                    val percentText = pnl.realizedPnlPercent?.let { String.format(Locale.US, " (%s%.2f%%)", sign, it) } ?: ""
+                    Text(
+                        text = String.format(Locale.US, "%s%.2f USDT%s", sign, pnl.realizedPnlUsdt, percentText),
+                        color = pnlColor,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                }
-                state.futuresTodayPnl?.let { pnl ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = Strings.futuresTodayPnl.resolve(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        val pnlColor = if (pnl.realizedPnlUsdt >= 0) ProfitGreen else LossRed
-                        val sign = if (pnl.realizedPnlUsdt >= 0) "+" else ""
-                        val percentText = pnl.realizedPnlPercent?.let { String.format(Locale.US, " (%s%.2f%%)", sign, it) } ?: ""
-                        Text(
-                            text = String.format(Locale.US, "%s%.2f USDT%s", sign, pnl.realizedPnlUsdt, percentText),
-                            color = pnlColor,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-
-            if (nonZeroBalances.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                Divider()
-                Spacer(Modifier.height(8.dp))
-                for (balance in nonZeroBalances) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = balance.asset, style = MaterialTheme.typography.bodyMedium)
-                        Text(text = formatQty(balance.free + balance.locked), style = MaterialTheme.typography.bodyMedium)
-                    }
                 }
             }
         }
     }
 }
-
