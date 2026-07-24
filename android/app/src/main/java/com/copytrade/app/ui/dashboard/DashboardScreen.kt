@@ -247,6 +247,12 @@ private fun formatQty(qty: Double): String = String.format(Locale.US, "%.8f", qt
 @Composable
 private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modifier) {
     val nonZeroBalances = state.balances.filter { it.free + it.locked > 0 }
+    val hasSpotActivity = nonZeroBalances.isNotEmpty() || state.bots.any { it.type == "grid" || it.type == "dca" }
+    // Most accounts here only trade futures — don't lead with an unused spot number.
+    // Spot only takes the headline once it's actually in use (non-zero balance or a
+    // spot bot exists); until then, the futures balance is what's shown up top.
+    val showSpotAsHeadline = hasSpotActivity || state.futuresAvailableUsdt == null
+
     Card(modifier = modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -257,52 +263,66 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
                 Text(text = Strings.totalBalance.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = Strings.accountSpotMode.resolve(),
+                        text = if (showSpotAsHeadline) Strings.accountSpotMode.resolve() else Strings.futuresTitle.resolve(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(end = 4.dp)
                     )
-                    ModeBadge(mode = state.mode)
+                    ModeBadge(mode = if (showSpotAsHeadline) state.mode else (state.futuresMode ?: state.mode))
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = state.totalValueUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            state.totalValuePhp?.let {
+            if (showSpotAsHeadline) {
                 Text(
-                    text = String.format(Locale.US, "≈ ₱%.2f", it),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
+                    text = state.totalValueUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                state.totalValuePhp?.let {
+                    Text(
+                        text = String.format(Locale.US, "≈ ₱%.2f", it),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            } else {
+                Text(
+                    text = state.futuresAvailableUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
+                    style = MaterialTheme.typography.headlineMedium
                 )
             }
 
             state.futuresAvailableUsdt?.let {
-                Spacer(Modifier.height(12.dp))
-                Divider()
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                if (showSpotAsHeadline) {
+                    Spacer(Modifier.height(12.dp))
+                    Divider()
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = Strings.futuresAvailable.resolve(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(end = 6.dp)
+                            )
+                            state.futuresMode?.let { fMode -> ModeBadge(mode = fMode) }
+                        }
                         Text(
-                            text = Strings.futuresAvailable.resolve(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = String.format(Locale.US, "%.2f USDT", it),
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(end = 6.dp)
+                            fontWeight = FontWeight.SemiBold
                         )
-                        state.futuresMode?.let { fMode -> ModeBadge(mode = fMode) }
                     }
-                    Text(
-                        text = String.format(Locale.US, "%.2f USDT", it),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
                 }
                 state.futuresTodayPnl?.let { pnl ->
+                    if (!showSpotAsHeadline) {
+                        Spacer(Modifier.height(12.dp))
+                        Divider()
+                        Spacer(Modifier.height(8.dp))
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -325,7 +345,7 @@ private fun TotalBalanceCard(state: DashboardUiState, modifier: Modifier = Modif
                 }
             }
 
-            if (nonZeroBalances.isNotEmpty()) {
+            if (showSpotAsHeadline && nonZeroBalances.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Divider()
                 Spacer(Modifier.height(8.dp))
