@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.CandlestickChart
+import com.copytrade.app.ui.components.FAST_POLL_INTERVAL_MS
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
@@ -78,7 +79,7 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
     val positionOpenedMessage = Strings.positionOpened.resolve()
     val orderPlacedMessage = Strings.orderPlaced.resolve()
 
-    PollWhileForeground { viewModel.refresh() }
+    PollWhileForeground(intervalMs = FAST_POLL_INTERVAL_MS) { viewModel.refresh() }
 
     LaunchedEffect(state.opened) {
         if (state.opened) {
