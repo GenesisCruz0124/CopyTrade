@@ -31,13 +31,17 @@ class CopySignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            // Captured so a slow poll from before a tab switch can't clobber a
+            // faster response for the tab the user is now looking at.
+            val requestedArchived = _uiState.value.showArchived
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val repo = app.repositoryFor(url)
-                val showArchived = _uiState.value.showArchived
-                val signals = repo.getCopySignals("PENDING", archived = showArchived)
+                val signals = repo.getCopySignals("PENDING", archived = requestedArchived)
+                if (_uiState.value.showArchived != requestedArchived) return@launch
                 _uiState.value = _uiState.value.copy(signals = signals, isLoading = false)
             } catch (e: Exception) {
+                if (_uiState.value.showArchived != requestedArchived) return@launch
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.toUserMessage())
             }
         }
