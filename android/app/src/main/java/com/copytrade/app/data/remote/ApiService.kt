@@ -101,13 +101,22 @@ interface ApiService {
     suspend fun killSwitch(): OkResponseDto
 
     @GET("copy-signals")
-    suspend fun getCopySignals(@Query("status") status: String? = null): CopySignalsResponseDto
+    suspend fun getCopySignals(
+        @Query("status") status: String? = null,
+        @Query("archived") archived: Boolean? = null
+    ): CopySignalsResponseDto
 
     @POST("copy-signals/{id}/approve")
     suspend fun approveCopySignal(@Path("id") id: String): CopySignalResponseDto
 
     @POST("copy-signals/{id}/reject")
     suspend fun rejectCopySignal(@Path("id") id: String): CopySignalResponseDto
+
+    @POST("copy-signals/{id}/archive")
+    suspend fun archiveCopySignal(@Path("id") id: String): CopySignalResponseDto
+
+    @POST("copy-signals/{id}/unarchive")
+    suspend fun unarchiveCopySignal(@Path("id") id: String): CopySignalResponseDto
 
     @GET("futures/symbols")
     suspend fun getFuturesSymbols(): FuturesSymbolsResponseDto

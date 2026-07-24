@@ -127,11 +127,16 @@ class EngineRepository(
         refreshBots()
     }
 
-    suspend fun getCopySignals(status: String? = null): List<CopySignalDto> = api.getCopySignals(status).signals
+    suspend fun getCopySignals(status: String? = null, archived: Boolean? = null): List<CopySignalDto> =
+        api.getCopySignals(status, archived).signals
 
     suspend fun approveCopySignal(id: String): CopySignalDto? = api.approveCopySignal(id).signal
 
     suspend fun rejectCopySignal(id: String): CopySignalDto? = api.rejectCopySignal(id).signal
+
+    suspend fun archiveCopySignal(id: String): CopySignalDto? = api.archiveCopySignal(id).signal
+
+    suspend fun unarchiveCopySignal(id: String): CopySignalDto? = api.unarchiveCopySignal(id).signal
 
     suspend fun getFuturesSymbols(): List<FuturesSymbolDto> = api.getFuturesSymbols().symbols
 

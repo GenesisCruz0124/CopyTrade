@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,6 +24,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -83,12 +87,27 @@ fun CopySignalsList(onOpenFutures: () -> Unit, modifier: Modifier = Modifier) {
     PollWhileForeground { viewModel.refresh() }
 
     Column(modifier = modifier) {
+        val tabIndex = if (state.showArchived) 1 else 0
+        TabRow(selectedTabIndex = tabIndex) {
+            Tab(
+                selected = !state.showArchived,
+                onClick = { viewModel.setShowArchived(false) },
+                text = { Text(Strings.pendingSignalsTab.resolve()) }
+            )
+            Tab(
+                selected = state.showArchived,
+                onClick = { viewModel.setShowArchived(true) },
+                text = { Text(Strings.archivedTab.resolve()) }
+            )
+        }
+
         state.error?.let {
             Text(it, color = LossRed, modifier = Modifier.padding(16.dp))
         }
         if (state.signals.isEmpty()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(Strings.noPendingSignals.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val emptyLabel = if (state.showArchived) Strings.noArchivedSignals else Strings.noPendingSignals
+                Text(emptyLabel.resolve(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -100,6 +119,7 @@ fun CopySignalsList(onOpenFutures: () -> Unit, modifier: Modifier = Modifier) {
                     CopySignalCard(
                         signal = signal,
                         serverUrl = serverUrl,
+                        archivedView = state.showArchived,
                         canCopy = viewModel.canCopyToFutures(signal),
                         canQuickRiskTrade = viewModel.canQuickRiskTrade(signal),
                         onCopyToFutures = {
@@ -112,7 +132,9 @@ fun CopySignalsList(onOpenFutures: () -> Unit, modifier: Modifier = Modifier) {
                                 if (viewModel.prepareFuturesHandoff(signal, riskUsdAmount = QUICK_RISK_TRADE_USD)) onOpenFutures()
                             }
                         },
-                        onReject = { viewModel.reject(signal.id) }
+                        onReject = { viewModel.reject(signal.id) },
+                        onArchive = { viewModel.archive(signal.id) },
+                        onUnarchive = { viewModel.unarchive(signal.id) }
                     )
                 }
             }
@@ -149,11 +171,14 @@ private const val QUICK_RISK_TRADE_USD = 1.0
 private fun CopySignalCard(
     signal: CopySignalDto,
     serverUrl: String,
+    archivedView: Boolean,
     canCopy: Boolean,
     canQuickRiskTrade: Boolean,
     onCopyToFutures: () -> Unit,
     onQuickRiskTrade: () -> Unit,
-    onReject: () -> Unit
+    onReject: () -> Unit,
+    onArchive: () -> Unit,
+    onUnarchive: () -> Unit
 ) {
     val app = LocalContext.current.applicationContext as CopyTradeApp
     val imageLoader = remember { coil.ImageLoader.Builder(app).okHttpClient { buildAuthenticatedHttpClient(app.settingsRepository) }.build() }
@@ -174,10 +199,25 @@ private fun CopySignalCard(
                 )
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
                 Text(text = signal.symbol ?: "?", style = MaterialTheme.typography.titleMedium)
-                val sideColor = if (signal.side == "long") ProfitGreen else LossRed
-                Text(text = (signal.side ?: "?").uppercase(Locale.US), color = sideColor, style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    val sideColor = if (signal.side == "long") ProfitGreen else LossRed
+                    Text(text = (signal.side ?: "?").uppercase(Locale.US), color = sideColor, style = MaterialTheme.typography.titleMedium)
+                    if (archivedView) {
+                        IconButton(onClick = onUnarchive) {
+                            Icon(Icons.Filled.Unarchive, contentDescription = Strings.unarchive.resolve())
+                        }
+                    } else {
+                        IconButton(onClick = onArchive) {
+                            Icon(Icons.Filled.Archive, contentDescription = Strings.archive.resolve())
+                        }
+                    }
+                }
             }
 
             ValidityBadge(priceCheck = signal.priceCheck)
@@ -204,36 +244,40 @@ private fun CopySignalCard(
                 )
             }
 
-            // Copying to Futures never executes — it hands the signal's params to
-            // the Futures form where the user sets size/risk and places the order.
-            Text(
-                text = Strings.copyToFuturesHint.resolve(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            // Archived signals are out of the active review flow until unarchived —
+            // approve/reject/copy actions reappear once it's back in the Pending tab.
+            if (!archivedView) {
+                // Copying to Futures never executes — it hands the signal's params to
+                // the Futures form where the user sets size/risk and places the order.
+                Text(
+                    text = Strings.copyToFuturesHint.resolve(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
 
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onReject, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    Text(Strings.reject.resolve(), color = LossRed)
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onReject, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        Text(Strings.reject.resolve(), color = LossRed)
+                    }
+                    Button(
+                        onClick = onCopyToFutures,
+                        enabled = canCopy,
+                        modifier = Modifier.fillMaxWidth().weight(1f)
+                    ) {
+                        Text(Strings.copyToFutures.resolve())
+                    }
                 }
-                Button(
-                    onClick = onCopyToFutures,
-                    enabled = canCopy,
-                    modifier = Modifier.fillMaxWidth().weight(1f)
+
+                // Same hand-off as "Copy to Futures", but also derives the position size
+                // so this trade risks exactly $1 if the signal's stop-loss hits.
+                OutlinedButton(
+                    onClick = onQuickRiskTrade,
+                    enabled = canQuickRiskTrade,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
-                    Text(Strings.copyToFutures.resolve())
+                    Text(Strings.quickRiskTrade.resolve())
                 }
-            }
-
-            // Same hand-off as "Copy to Futures", but also derives the position size
-            // so this trade risks exactly $1 if the signal's stop-loss hits.
-            OutlinedButton(
-                onClick = onQuickRiskTrade,
-                enabled = canQuickRiskTrade,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-            ) {
-                Text(Strings.quickRiskTrade.resolve())
             }
         }
     }

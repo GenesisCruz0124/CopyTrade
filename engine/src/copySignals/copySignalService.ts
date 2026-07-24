@@ -22,6 +22,7 @@ export interface CopySignalRow {
   status: "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED";
   order_id: string | null;
   failure_reason: string | null;
+  archived_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -107,11 +108,23 @@ export class CopySignalService {
     return this.get(id)!;
   }
 
-  list(status?: CopySignalRow["status"]): CopySignalRow[] {
+  /** [archivedOnly] false (default) returns only non-archived signals (the normal
+   *  feed); true returns only archived ones (a separate view, not mixed with the
+   *  normal feed). Archiving hides a signal without changing its status, unlike
+   *  REJECTED which is terminal, so an archived PENDING signal can still be
+   *  unarchived and acted on. */
+  list(status?: CopySignalRow["status"], archivedOnly = false): CopySignalRow[] {
+    const conditions: string[] = [];
+    const params: string[] = [];
     if (status) {
-      return this.db.prepare(`SELECT * FROM copy_signals WHERE status = ? ORDER BY created_at DESC`).all(status) as CopySignalRow[];
+      conditions.push("status = ?");
+      params.push(status);
     }
-    return this.db.prepare(`SELECT * FROM copy_signals ORDER BY created_at DESC LIMIT 200`).all() as CopySignalRow[];
+    conditions.push(archivedOnly ? "archived_at IS NOT NULL" : "archived_at IS NULL");
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    return this.db
+      .prepare(`SELECT * FROM copy_signals ${where} ORDER BY created_at DESC LIMIT 200`)
+      .all(...params) as CopySignalRow[];
   }
 
   get(id: string): CopySignalRow | undefined {
@@ -123,8 +136,8 @@ export class CopySignalService {
    * reviewer can see whether the call has already played out (hit TP) or already
    * been invalidated (blown through SL) before they approve/reject it.
    */
-  async listWithPriceCheck(status?: CopySignalRow["status"]): Promise<CopySignalWithPriceCheck[]> {
-    const rows = this.list(status);
+  async listWithPriceCheck(status?: CopySignalRow["status"], archivedOnly = false): Promise<CopySignalWithPriceCheck[]> {
+    const rows = this.list(status, archivedOnly);
     const results: CopySignalWithPriceCheck[] = [];
     for (const row of rows) {
       if (row.status !== "PENDING" || !row.symbol || !row.side) {
@@ -181,6 +194,22 @@ export class CopySignalService {
     const row = this.requireRow(id);
     this.updateStatus(id, "REJECTED");
     return { ...row, status: "REJECTED" };
+  }
+
+  /** Hides a signal from the default feed without touching its status — reversible,
+   *  unlike reject(). Archiving an already-archived signal is a harmless no-op. */
+  archive(id: string): CopySignalRow {
+    const row = this.requireRow(id);
+    const now = Date.now();
+    this.db.prepare(`UPDATE copy_signals SET archived_at = ?, updated_at = ? WHERE id = ?`).run(now, now, id);
+    return { ...row, archived_at: now, updated_at: now };
+  }
+
+  unarchive(id: string): CopySignalRow {
+    const row = this.requireRow(id);
+    const now = Date.now();
+    this.db.prepare(`UPDATE copy_signals SET archived_at = NULL, updated_at = ? WHERE id = ?`).run(now, id);
+    return { ...row, archived_at: null, updated_at: now };
   }
 
   /** Sizes the position as a fixed % of the dedicated copy-trading budget and places the order. */

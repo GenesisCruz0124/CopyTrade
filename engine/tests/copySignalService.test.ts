@@ -168,3 +168,82 @@ describe("CopySignalService.listWithPriceCheck", () => {
     expect(signal.price_note).toBeNull();
   });
 });
+
+describe("CopySignalService archiving", () => {
+  let db: Database.Database;
+  let service: CopySignalService;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    runMigrations(db);
+
+    const fakeFuturesTrading = {} as unknown as FuturesTradingService;
+    const fakeFuturesClient = {
+      ticker: async (symbol: string): Promise<FuturesTicker> => ({ symbol, lastPrice: 0.6, fairPrice: 0.6 })
+    } as unknown as FuturesExchangeClient;
+
+    service = new CopySignalService(db, fakeFuturesClient, fakeFuturesTrading, {
+      botId: "copy-trading",
+      budgetUsdt: 1000,
+      riskPctPerTrade: 2,
+      defaultLeverage: 3,
+      marginMode: "isolated"
+    });
+  });
+
+  it("hides an archived signal from the default list without changing its status, and the archived view is archived-only", async () => {
+    const keep = service.createFromExtraction({
+      channelMessageId: "msg-keep",
+      imagePath: null,
+      extraction: baseExtraction()
+    });
+    const signal = service.createFromExtraction({
+      channelMessageId: "msg-archive",
+      imagePath: null,
+      extraction: baseExtraction()
+    });
+
+    const archived = service.archive(signal.id);
+    expect(archived.status).toBe("PENDING");
+    expect(archived.archived_at).not.toBeNull();
+
+    const defaultList = await service.listWithPriceCheck("PENDING");
+    expect(defaultList.find((s) => s.id === signal.id)).toBeUndefined();
+    expect(defaultList.find((s) => s.id === keep.id)).toBeDefined();
+
+    const archivedList = await service.listWithPriceCheck("PENDING", true);
+    expect(archivedList.find((s) => s.id === signal.id)).toBeDefined();
+    // Archived view is archived-only, not a mix — the non-archived signal must not appear.
+    expect(archivedList.find((s) => s.id === keep.id)).toBeUndefined();
+  });
+
+  it("unarchive brings a signal back into the default list", async () => {
+    const signal = service.createFromExtraction({
+      channelMessageId: "msg-unarchive",
+      imagePath: null,
+      extraction: baseExtraction()
+    });
+    service.archive(signal.id);
+
+    const unarchived = service.unarchive(signal.id);
+    expect(unarchived.archived_at).toBeNull();
+
+    const defaultList = await service.listWithPriceCheck("PENDING");
+    expect(defaultList.find((s) => s.id === signal.id)).toBeDefined();
+  });
+
+  it("archiving twice is a harmless no-op", () => {
+    const signal = service.createFromExtraction({
+      channelMessageId: "msg-double-archive",
+      imagePath: null,
+      extraction: baseExtraction()
+    });
+    service.archive(signal.id);
+    expect(() => service.archive(signal.id)).not.toThrow();
+    expect(service.get(signal.id)!.archived_at).not.toBeNull();
+  });
+
+  it("throws archiving a nonexistent signal", () => {
+    expect(() => service.archive("nonexistent")).toThrow(/not found/);
+  });
+});
