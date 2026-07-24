@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.copysignals.CopySignalsList
 import com.copytrade.app.ui.components.ConfirmDialog
+import com.copytrade.app.ui.components.FAST_POLL_INTERVAL_MS
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.futures.ClosedPositionCard
@@ -89,7 +90,7 @@ fun DashboardScreen(
     var showMenu by remember { mutableStateOf(false) }
     var tabIndex by remember { mutableIntStateOf(0) }
 
-    PollWhileForeground {
+    PollWhileForeground(intervalMs = FAST_POLL_INTERVAL_MS) {
         viewModel.refresh()
         futuresViewModel.refresh()
     }
