@@ -91,8 +91,8 @@ fun DashboardScreen(
     var tabIndex by remember { mutableIntStateOf(0) }
 
     PollWhileForeground(intervalMs = FAST_POLL_INTERVAL_MS) {
-        viewModel.refresh()
-        futuresViewModel.refresh()
+        viewModel.refresh(silent = true)
+        futuresViewModel.refresh(silent = true)
     }
 
     Scaffold(

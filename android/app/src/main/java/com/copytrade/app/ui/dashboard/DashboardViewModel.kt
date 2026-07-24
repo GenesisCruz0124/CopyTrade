@@ -53,9 +53,12 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
         refresh()
     }
 
-    fun refresh() {
+    /** [silent]: skip the isRefreshing flip that drives the pull-to-refresh spinner —
+     *  used for the automatic background poll so it doesn't flash on every tick;
+     *  a manual pull-to-refresh gesture still wants the visible spinner. */
+    fun refresh(silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
+            if (!silent) _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val repo = app.repositoryFor(url)
