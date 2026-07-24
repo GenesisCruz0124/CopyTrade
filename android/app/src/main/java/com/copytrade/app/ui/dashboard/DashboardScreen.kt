@@ -65,7 +65,6 @@ import com.copytrade.app.ui.futures.PositionCard
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
-import com.copytrade.app.ui.theme.ProfitGreen
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
