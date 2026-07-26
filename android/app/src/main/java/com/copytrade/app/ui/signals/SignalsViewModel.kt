@@ -7,6 +7,7 @@ import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.data.remote.dto.SpotSymbolDto
 import com.copytrade.app.data.remote.toUserMessage
+import com.copytrade.app.ui.futures.FuturesPrefill
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,8 @@ data class SignalsUiState(
     val interval: String = "15m",
     val signal: SignalDto? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val symbolsLoadFailed: Boolean = false
 )
 
 class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
@@ -48,9 +50,12 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 val symbols = app.repositoryFor(url).getSymbols()
-                _uiState.value = _uiState.value.copy(symbols = symbols)
+                _uiState.value = _uiState.value.copy(symbols = symbols, symbolsLoadFailed = false)
             } catch (_: Exception) {
-                // Best-effort — typing a pair manually still works without the picker list.
+                // Typing a pair manually still works without the picker list — this only
+                // flags it so the screen can explain why no suggestions ever show up,
+                // instead of the dropdown silently never appearing for no visible reason.
+                _uiState.value = _uiState.value.copy(symbolsLoadFailed = true)
             }
         }
     }
@@ -129,19 +134,34 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
     }
 
     /**
-     * Persist the analyzed pair and direction so the Futures screen picks them up
-     * on open. Returns the side ("long"/"short") to hand off, or null if the
-     * current signal is NEUTRAL (nothing to trade).
+     * Persist the analyzed pair, direction, and suggested entry/SL/TP as a one-shot
+     * Futures prefill so the Futures screen opens pre-populated — the same hand-off
+     * Copy signals uses. Does NOT execute anything. Returns false if the current
+     * signal is NEUTRAL (nothing to trade).
+     *
+     * [riskUsdAmount] powers the "$N risk trade" quick action: when set, the Futures
+     * form derives the position size so the trade risks exactly that many dollars if
+     * the stop-loss hits, instead of leaving size for the user to fill in.
      */
-    suspend fun prepareTradeHandoff(): Boolean {
+    suspend fun prepareTradeHandoff(riskUsdAmount: Double? = null): Boolean {
         val signal = _uiState.value.signal ?: return false
         val side = when (signal.signal) {
             "LONG" -> "long"
             "SHORT" -> "short"
             else -> return false
         }
-        app.settingsRepository.setFuturesSymbol(signal.symbol)
-        app.settingsRepository.setFuturesSide(side)
+        // Spot symbols have no separator (BTCUSDT); futures pairs need one (BTC_USDT).
+        // /symbols is filtered to USDT quotes, so this suffix swap always applies.
+        val futuresSymbol = signal.symbol.removeSuffix("USDT") + "_USDT"
+        val prefill = FuturesPrefill(
+            symbol = futuresSymbol,
+            side = side,
+            entryPrice = signal.suggestedEntry,
+            stopLoss = signal.stopLoss,
+            takeProfit = signal.takeProfit,
+            riskUsdAmount = riskUsdAmount
+        )
+        app.settingsRepository.setFuturesPrefill(prefill.toJson())
         return true
     }
 }

@@ -13,6 +13,13 @@ import type {
 
 const BASE_URL = "https://api.mexc.com/api/v3";
 
+/** MEXC's spot kline interval enum doesn't follow the usual "1h" shorthand — it wants
+ *  "60m". Callers (the app, indicator/signal code) use the conventional form, so translate
+ *  it here rather than pushing MEXC's quirk out to every caller. */
+function toMexcKlineInterval(interval: string): string {
+  return interval === "1h" ? "60m" : interval;
+}
+
 export class MexcRateLimitError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -137,7 +144,7 @@ export class MexcRestClient {
     const raw = await this.request<any[]>(
       "GET",
       "/klines",
-      { symbol, interval, limit },
+      { symbol, interval: toMexcKlineInterval(interval), limit },
       { signed: false, queue: this.generalQueue }
     );
     return raw.map((k) => ({
