@@ -248,6 +248,8 @@ object Strings {
         "Optional — magkano ang gusto mong ma-risk; awtomatikong pupunuin ang laki ng position"
     )
     val tradingFeeLabel = Bi("Trading fee", "Trading fee")
+    val marginLabel = Bi("Margin", "Margin")
+    val quantityLabel = Bi("Quantity", "Quantity")
     val stopLossByPercent = Bi("Stop-loss %", "Stop-loss %")
     val stopLossByPrice = Bi("Stop-loss price", "Stop-loss price")
     val stopLossPriceLabel = Bi("Stop-loss price (USD)", "Stop-loss price (USD)")

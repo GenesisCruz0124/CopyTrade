@@ -28,6 +28,9 @@ data class DashboardUiState(
     val balances: List<BalanceDto> = emptyList(),
     val totalValueUsdt: Double? = null,
     val totalValuePhp: Double? = null,
+    /** USD->PHP rate — a plain currency rate, so it's reused to convert the futures
+     *  balance/PnL too even though the engine only computes it against spot's total. */
+    val usdToPhpRate: Double? = null,
     val futuresAvailableUsdt: Double? = null,
     val futuresTodayPnl: FuturesTodayPnlDto? = null,
     val bots: List<BotEntity> = emptyList(),
@@ -76,6 +79,7 @@ class DashboardViewModel(private val app: CopyTradeApp) : ViewModel() {
                     balances = status.balances,
                     totalValueUsdt = status.totalValueUsdt,
                     totalValuePhp = status.totalValuePhp,
+                    usdToPhpRate = status.usdToPhpRate,
                     futuresAvailableUsdt = futuresBalance?.balance?.availableBalance,
                     futuresTodayPnl = futuresTodayPnl,
                     killSwitchEngaged = status.killSwitchEngaged,
