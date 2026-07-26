@@ -160,6 +160,10 @@ object Strings {
     // Market signals
     val signalsTitle = Bi("Market signals", "Market signals")
     val signalsPairLabel = Bi("Coin pair (e.g. BTCUSDT)", "Coin pair (e.g. BTCUSDT)")
+    val signalsPairListUnavailable = Bi(
+        "Pair list unavailable — type the full symbol and tap Analyze",
+        "Hindi available ang listahan ng pares — i-type ang buong symbol at i-tap ang Analyze"
+    )
     val signalsTimeframe = Bi("Timeframe", "Timeframe")
     val signalsAnalyze = Bi("Analyze", "I-analyze")
     val signalsAnalyzing = Bi("Analyzing market…", "Ina-analyze ang market…")

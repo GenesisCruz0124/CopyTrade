@@ -61,6 +61,9 @@ import com.copytrade.app.ui.theme.ProfitGreen
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/** Fixed risk size for the quick "$1 risk trade" action — small enough to test a signal live at minimal cost. */
+private const val QUICK_RISK_TRADE_USD = 1.0
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
@@ -149,6 +152,12 @@ fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
                         }
                     }
                 }
+            } else if (expanded && state.symbolsLoadFailed) {
+                Text(
+                    Strings.signalsPairListUnavailable.resolve(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             if (state.selectedSymbol.isNotBlank()) {
                 Text(
@@ -205,6 +214,18 @@ fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(Strings.signalsTradeThis.resolve())
+                        }
+                        // Same hand-off as "Trade this signal", but also derives the position
+                        // size so this trade risks exactly $1 if the suggested stop-loss hits.
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    if (viewModel.prepareTradeHandoff(riskUsdAmount = QUICK_RISK_TRADE_USD)) onTradeSignal()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        ) {
+                            Text(Strings.quickRiskTrade.resolve())
                         }
                     }
                     Text(
