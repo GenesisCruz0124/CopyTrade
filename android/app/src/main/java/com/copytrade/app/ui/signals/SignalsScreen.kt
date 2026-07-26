@@ -227,6 +227,16 @@ fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
                         ) {
                             Text(Strings.quickRiskTrade.resolve())
                         }
+                        // The risk/reward ratio directly gives the payoff for a fixed $1 risk —
+                        // no need to wait for the Futures form to size the position first.
+                        state.signal!!.riskRewardRatio?.let { ratio ->
+                            Text(
+                                text = "≈ $${"%.2f".format(QUICK_RISK_TRADE_USD * ratio)} ${Strings.impliedProfitHint.resolve()}",
+                                color = ProfitGreen,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
                     }
                     Text(
                         Strings.signalsDisclaimer.resolve(),
