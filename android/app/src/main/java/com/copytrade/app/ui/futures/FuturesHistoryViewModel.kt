@@ -19,6 +19,8 @@ data class FuturesHistoryUiState(
     val closedPositions: List<FuturesPositionDto> = emptyList(),
     val pendingOrders: List<FuturesPendingOrderDto> = emptyList(),
     val todayPnl: FuturesTodayPnlDto? = null,
+    /** USD->PHP rate for the unrealized-PnL PHP equivalent on open position cards. */
+    val usdToPhpRate: Double? = null,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -46,12 +48,16 @@ class FuturesHistoryViewModel(private val app: CopyTradeApp) : ViewModel() {
                 // Futures has its own paper/live mode, independent of spot's — read it from
                 // a futures response (todayPnl already carries it), not repo.getStatus().
                 val todayPnl = runCatching { repo.getFuturesTodayPnl() }.getOrNull()
+                // usdToPhpRate is just a currency rate from /status — best-effort, and kept
+                // on a failed fetch instead of flickering to null (it rarely changes anyway).
+                val usdToPhpRate = runCatching { repo.getStatus().usdToPhpRate }.getOrNull() ?: _uiState.value.usdToPhpRate
                 _uiState.value = _uiState.value.copy(
                     mode = todayPnl?.mode ?: _uiState.value.mode,
                     openPositions = open,
                     closedPositions = closed,
                     pendingOrders = pending,
                     todayPnl = todayPnl,
+                    usdToPhpRate = usdToPhpRate,
                     isLoading = false,
                     error = null
                 )

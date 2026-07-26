@@ -143,7 +143,7 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.positions.forEach { position ->
-                        PositionCard(position = position, onClose = { viewModel.closePosition(position.id) })
+                        PositionCard(position = position, onClose = { viewModel.closePosition(position.id) }, phpRate = state.usdToPhpRate)
                     }
                 }
             }
@@ -440,7 +440,7 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
 }
 
 @Composable
-internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
+internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit, phpRate: Double? = null) {
     var showCloseConfirm by remember { mutableStateOf(false) }
     val pnlUsdt = position.unrealizedPnlUsdt
     val pnlPercent = position.unrealizedPnlPercent
@@ -506,6 +506,13 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                phpRate?.let { rate ->
+                    Text(
+                        "$sign₱${"%.2f".format(abs(pnlUsdt) * rate)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 position.riskUsdt?.let {

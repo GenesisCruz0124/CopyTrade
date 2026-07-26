@@ -89,7 +89,7 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.openPositions, key = { it.id }) { position ->
-                            PositionCard(position = position, onClose = { viewModel.closePosition(position.id) })
+                            PositionCard(position = position, onClose = { viewModel.closePosition(position.id) }, phpRate = state.usdToPhpRate)
                         }
                     }
                 }
