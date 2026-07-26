@@ -466,6 +466,36 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
                     Text("${Strings.currentPriceLabel.resolve()}: ${formatPrice(it)}", style = MaterialTheme.typography.bodyMedium)
                 }
             }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "${Strings.marginLabel.resolve()}: $${"%.2f".format(position.marginUsdt)} (${position.openType})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "${Strings.quantityLabel.resolve()}: ${formatPrice(position.quantity)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (position.stopLossPrice != null || position.takeProfitPrice != null) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    position.stopLossPrice?.let {
+                        Text(
+                            "${Strings.signalsStopLoss.resolve()}: ${formatPrice(it)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LossRed
+                        )
+                    }
+                    position.takeProfitPrice?.let {
+                        Text(
+                            "${Strings.signalsTakeProfit.resolve()}: ${formatPrice(it)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ProfitGreen
+                        )
+                    }
+                }
+            }
             if (pnlUsdt != null && pnlPercent != null) {
                 val sign = if (pnlUsdt > 0) "+" else if (pnlUsdt < 0) "-" else ""
                 Text(

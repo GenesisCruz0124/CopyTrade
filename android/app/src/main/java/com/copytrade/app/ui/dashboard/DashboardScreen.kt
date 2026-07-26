@@ -68,6 +68,7 @@ import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
 import com.copytrade.app.ui.theme.ProfitGreen
 import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -300,6 +301,13 @@ private fun FuturesBalanceCard(
                 text = state.futuresAvailableUsdt?.let { String.format(Locale.US, "%.2f USDT", it) } ?: "— USDT",
                 style = MaterialTheme.typography.headlineMedium
             )
+            if (state.futuresAvailableUsdt != null && state.usdToPhpRate != null) {
+                Text(
+                    text = String.format(Locale.US, "≈ ₱%.2f", state.futuresAvailableUsdt * state.usdToPhpRate),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
 
             state.futuresTodayPnl?.let { pnl ->
                 Spacer(Modifier.height(8.dp))
@@ -312,15 +320,24 @@ private fun FuturesBalanceCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    val pnlColor = if (pnl.realizedPnlUsdt >= 0) ProfitGreen else LossRed
-                    val sign = if (pnl.realizedPnlUsdt >= 0) "+" else ""
-                    val percentText = pnl.realizedPnlPercent?.let { String.format(Locale.US, " (%s%.2f%%)", sign, it) } ?: ""
-                    Text(
-                        text = String.format(Locale.US, "%s%.2f USDT%s", sign, pnl.realizedPnlUsdt, percentText),
-                        color = pnlColor,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        val pnlColor = if (pnl.realizedPnlUsdt >= 0) ProfitGreen else LossRed
+                        val sign = if (pnl.realizedPnlUsdt >= 0) "+" else ""
+                        val percentText = pnl.realizedPnlPercent?.let { String.format(Locale.US, " (%s%.2f%%)", sign, it) } ?: ""
+                        Text(
+                            text = String.format(Locale.US, "%s%.2f USDT%s", sign, pnl.realizedPnlUsdt, percentText),
+                            color = pnlColor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        state.usdToPhpRate?.let { rate ->
+                            Text(
+                                text = String.format(Locale.US, "%s₱%.2f", sign, abs(pnl.realizedPnlUsdt) * rate),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                 }
             }
         }
