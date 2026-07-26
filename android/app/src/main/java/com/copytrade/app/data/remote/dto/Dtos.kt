@@ -241,6 +241,20 @@ data class FuturesSymbolsResponseDto(
 )
 
 @Serializable
+data class SpotSymbolDto(
+    val symbol: String,
+    val baseAsset: String,
+    val quoteAsset: String
+)
+
+@Serializable
+data class SpotSymbolsResponseDto(
+    val mode: String,
+    val symbols: List<SpotSymbolDto> = emptyList(),
+    val error: String? = null
+)
+
+@Serializable
 data class FuturesBalanceDto(
     val currency: String,
     val availableBalance: Double,

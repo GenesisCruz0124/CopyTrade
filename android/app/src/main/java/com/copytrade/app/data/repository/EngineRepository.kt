@@ -21,6 +21,7 @@ import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.SignalDto
+import com.copytrade.app.data.remote.dto.SpotSymbolDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import com.copytrade.app.data.remote.dto.TradingModeRequest
 import com.copytrade.app.data.remote.dto.UserDto
@@ -160,7 +161,9 @@ class EngineRepository(
 
     suspend fun getFuturesTodayPnl(): FuturesTodayPnlDto = api.getFuturesTodayPnl()
 
-    suspend fun getKlines(symbol: String): List<KlineDto> = api.getKlines(symbol).klines
+    suspend fun getKlines(symbol: String, interval: String = "15m"): List<KlineDto> = api.getKlines(symbol, interval).klines
+
+    suspend fun getSymbols(): List<SpotSymbolDto> = api.getSymbols().symbols
 
     suspend fun getFuturesKlines(symbol: String): List<KlineDto> = api.getFuturesKlines(symbol).klines
 

@@ -22,6 +22,7 @@ import com.copytrade.app.data.remote.dto.OrdersResponseDto
 import com.copytrade.app.data.remote.dto.PnlResponseDto
 import com.copytrade.app.data.remote.dto.PriceDto
 import com.copytrade.app.data.remote.dto.SignalResponseDto
+import com.copytrade.app.data.remote.dto.SpotSymbolsResponseDto
 import com.copytrade.app.data.remote.dto.StatusDto
 import com.copytrade.app.data.remote.dto.TradesResponseDto
 import com.copytrade.app.data.remote.dto.AuthCredentialsRequest
@@ -93,6 +94,9 @@ interface ApiService {
         @Path("symbol") symbol: String,
         @Query("interval") interval: String
     ): SignalResponseDto
+
+    @GET("symbols")
+    suspend fun getSymbols(): SpotSymbolsResponseDto
 
     @GET("events")
     suspend fun getEvents(@Query("since") since: Long): EventsResponseDto

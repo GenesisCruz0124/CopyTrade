@@ -7,17 +7,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -31,9 +36,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.ui.appViewModel
+import com.copytrade.app.ui.components.CandlestickChart
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -57,6 +67,14 @@ fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
     val viewModel = appViewModel { SignalsViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    var expanded by remember { mutableStateOf(false) }
+    val filteredSymbols = remember(state.symbols, state.symbolQuery) {
+        if (state.symbolQuery.isBlank()) {
+            state.symbols
+        } else {
+            state.symbols.filter { it.symbol.contains(state.symbolQuery.uppercase()) }
+        }.take(50)
+    }
 
     Scaffold(
         topBar = {
@@ -80,17 +98,67 @@ fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Deliberately not using ExposedDropdownMenuBox/ExposedDropdownMenu here — that popup-based
+            // menu flips to render above the anchor when the keyboard eats vertical space, which ends up
+            // covering the very field you're trying to edit. An inline list in the normal layout flow
+            // (below, pushing the rest of the form down) can never overlap the input.
             OutlinedTextField(
                 value = state.symbolQuery,
-                onValueChange = viewModel::setSymbolQuery,
+                onValueChange = {
+                    viewModel.setSymbolQuery(it)
+                    expanded = true
+                },
                 label = { Text(Strings.signalsPairLabel.resolve()) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
                     imeAction = ImeAction.Search
                 ),
-                modifier = Modifier.fillMaxWidth()
+                trailingIcon = {
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focus ->
+                        if (focus.isFocused) {
+                            expanded = true
+                            if (state.symbolQuery.isNotBlank() && state.symbolQuery == state.selectedSymbol) {
+                                viewModel.setSymbolQuery("")
+                            }
+                        } else if (state.symbolQuery.isBlank() && state.selectedSymbol.isNotBlank()) {
+                            viewModel.setSymbolQuery(state.selectedSymbol)
+                        }
+                    }
             )
+            if (expanded && filteredSymbols.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                ) {
+                    LazyColumn {
+                        items(filteredSymbols, key = { it.symbol }) { symbol ->
+                            DropdownMenuItem(
+                                text = { Text(symbol.symbol) },
+                                onClick = {
+                                    viewModel.selectSymbol(symbol.symbol)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            if (state.selectedSymbol.isNotBlank()) {
+                Text(
+                    text = state.currentPrice?.let { "${Strings.currentPriceLabel.resolve()}: $${formatPrice(it)}" }
+                        ?: Strings.loading.resolve(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                CandlestickChart(state.klines, modifier = Modifier.fillMaxWidth())
+            }
 
             Text(Strings.signalsTimeframe.resolve(), style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

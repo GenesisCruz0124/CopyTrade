@@ -3,7 +3,9 @@ package com.copytrade.app.ui.signals
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
+import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.SignalDto
+import com.copytrade.app.data.remote.dto.SpotSymbolDto
 import com.copytrade.app.data.remote.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +19,10 @@ val SIGNAL_INTERVALS = listOf("5m", "15m", "1h", "4h")
 data class SignalsUiState(
     val mode: String = "paper",
     val symbolQuery: String = "",
+    val selectedSymbol: String = "",
+    val symbols: List<SpotSymbolDto> = emptyList(),
+    val currentPrice: Double? = null,
+    val klines: List<KlineDto> = emptyList(),
     val interval: String = "15m",
     val signal: SignalDto? = null,
     val isLoading: Boolean = false,
@@ -28,11 +34,23 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
     val uiState: StateFlow<SignalsUiState> = _uiState.asStateFlow()
 
     init {
+        loadSymbols()
         // Seed the pair from the last futures symbol so the two screens feel linked.
+        // The futures symbol uses "_" (e.g. BTC_USDT) while spot pairs don't, so strip it.
         viewModelScope.launch {
-            val symbol = app.settingsRepository.futuresSymbol.first()
-            if (symbol.isNotBlank()) {
-                _uiState.value = _uiState.value.copy(symbolQuery = symbol)
+            val symbol = app.settingsRepository.futuresSymbol.first().replace("_", "")
+            if (symbol.isNotBlank()) selectSymbol(symbol)
+        }
+    }
+
+    private fun loadSymbols() {
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                val symbols = app.repositoryFor(url).getSymbols()
+                _uiState.value = _uiState.value.copy(symbols = symbols)
+            } catch (_: Exception) {
+                // Best-effort — typing a pair manually still works without the picker list.
             }
         }
     }
@@ -41,8 +59,52 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
         _uiState.value = _uiState.value.copy(symbolQuery = query.uppercase().trim())
     }
 
+    fun selectSymbol(symbol: String) {
+        _uiState.value = _uiState.value.copy(
+            symbolQuery = symbol,
+            selectedSymbol = symbol,
+            currentPrice = null,
+            klines = emptyList()
+        )
+        refreshPrice()
+        refreshKlines()
+    }
+
+    private fun refreshPrice() {
+        val symbol = _uiState.value.selectedSymbol
+        if (symbol.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                val price = app.repositoryFor(url).getPrice(symbol)
+                if (_uiState.value.selectedSymbol == symbol) {
+                    _uiState.value = _uiState.value.copy(currentPrice = price)
+                }
+            } catch (_: Exception) {
+                // Best-effort — the price ticker isn't critical enough to surface as an error.
+            }
+        }
+    }
+
+    private fun refreshKlines() {
+        val symbol = _uiState.value.selectedSymbol
+        if (symbol.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                val klines = app.repositoryFor(url).getKlines(symbol, _uiState.value.interval)
+                if (_uiState.value.selectedSymbol == symbol) {
+                    _uiState.value = _uiState.value.copy(klines = klines)
+                }
+            } catch (_: Exception) {
+                // Best-effort — the chart isn't critical enough to surface as an error.
+            }
+        }
+    }
+
     fun setInterval(interval: String) {
         _uiState.value = _uiState.value.copy(interval = interval)
+        refreshKlines()
         if (_uiState.value.symbolQuery.isNotBlank()) analyze()
     }
 
@@ -53,6 +115,7 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
             _uiState.value = _uiState.value.copy(error = "Enter a coin pair, e.g. BTCUSDT")
             return
         }
+        if (_uiState.value.selectedSymbol != symbol) selectSymbol(symbol)
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
