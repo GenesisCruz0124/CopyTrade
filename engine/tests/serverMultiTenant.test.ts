@@ -12,7 +12,12 @@ import type { FastifyInstance } from "fastify";
 
 const fakeExchange: ExchangeClient = {
   mode: "paper",
-  getExchangeInfo: async () => ({ symbols: [] }),
+  getExchangeInfo: async () => ({
+    symbols: [
+      { symbol: "BTCUSDT", baseAsset: "BTC", quoteAsset: "USDT", tickSize: 0.01, stepSize: 0.00001, minNotional: 1, minQty: 0, maxQty: 0, pricePrecision: 2, quantityPrecision: 5 },
+      { symbol: "ETHBTC", baseAsset: "ETH", quoteAsset: "BTC", tickSize: 0.00001, stepSize: 0.0001, minNotional: 1, minQty: 0, maxQty: 0, pricePrecision: 5, quantityPrecision: 4 }
+    ]
+  }),
   getTickerPrice: async () => ({ symbol: "BTCUSDT", price: 60000 }),
   getAccountInfo: async () => ({ balances: [] }),
   placeOrder: async () => {
@@ -83,6 +88,16 @@ describe("multi-tenant server routes", () => {
 
   beforeEach(() => {
     ({ app } = buildTestServer());
+  });
+
+  it("lists spot symbols filtered to USDT pairs", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/symbols",
+      headers: { authorization: `Bearer ${env.API_AUTH_TOKEN}` }
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().symbols).toEqual([{ symbol: "BTCUSDT", baseAsset: "BTC", quoteAsset: "USDT" }]);
   });
 
   it("rejects requests without a valid token", async () => {

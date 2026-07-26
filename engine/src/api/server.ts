@@ -338,6 +338,20 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     }
   );
 
+  // Spot trading pairs for the Market signals pair picker — mirrors /futures/symbols,
+  // filtered to USDT pairs since that's what /signals and /klines are used against here.
+  app.get("/symbols", async (_req, reply) => {
+    try {
+      const info = await deps.exchange.getExchangeInfo();
+      const symbols = info.symbols
+        .filter((s) => s.quoteAsset === "USDT")
+        .map((s) => ({ symbol: s.symbol, baseAsset: s.baseAsset, quoteAsset: s.quoteAsset }));
+      reply.send({ mode: modeOf(), symbols });
+    } catch (err) {
+      reply.code(502).send({ mode: modeOf(), error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
   app.get<{ Querystring: { since?: string } }>("/events", async (req, reply) => {
     const since = req.query.since ? Number(req.query.since) : 0;
     const events = deps.db
