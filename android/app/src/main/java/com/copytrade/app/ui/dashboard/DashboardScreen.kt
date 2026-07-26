@@ -222,7 +222,7 @@ fun DashboardScreen(
                     } else {
                         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(futuresState.closedPositions, key = { it.id }) { position ->
-                                ClosedPositionCard(position = position)
+                                ClosedPositionCard(position = position, phpRate = state.usdToPhpRate)
                             }
                         }
                     }
