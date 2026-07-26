@@ -522,9 +522,10 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit, php
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                position.totalFeeUsdt?.let {
+                position.totalFeeUsdt?.let { fee ->
+                    val phpText = phpRate?.let { rate -> " (≈₱${"%.2f".format(fee * rate)})" } ?: ""
                     Text(
-                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(it)}",
+                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(fee)}$phpText",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

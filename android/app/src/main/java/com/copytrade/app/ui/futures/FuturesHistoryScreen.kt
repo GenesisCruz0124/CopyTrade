@@ -117,7 +117,7 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.closedPositions, key = { it.id }) { position ->
-                            ClosedPositionCard(position = position)
+                            ClosedPositionCard(position = position, phpRate = state.usdToPhpRate)
                         }
                     }
                 }
@@ -213,7 +213,7 @@ internal fun closeReasonLabel(reason: String?): Bi = when (reason) {
 internal val dateFormat = SimpleDateFormat("MMM d, HH:mm", Locale.US)
 
 @Composable
-internal fun ClosedPositionCard(position: FuturesPositionDto) {
+internal fun ClosedPositionCard(position: FuturesPositionDto, phpRate: Double? = null) {
     val pnl = position.realizedPnlUsdt
     val pnlColor = when {
         pnl == null -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -263,9 +263,10 @@ internal fun ClosedPositionCard(position: FuturesPositionDto) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                position.totalFeeUsdt?.let {
+                position.totalFeeUsdt?.let { fee ->
+                    val phpText = phpRate?.let { rate -> " (≈₱${"%.2f".format(fee * rate)})" } ?: ""
                     Text(
-                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(it)}",
+                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(fee)}$phpText",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
