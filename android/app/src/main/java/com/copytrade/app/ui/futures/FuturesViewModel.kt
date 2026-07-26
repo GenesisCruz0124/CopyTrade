@@ -61,6 +61,8 @@ data class FuturesUiState(
     val riskUsdAmount: String = "",
     val balance: FuturesBalanceDto? = null,
     val positions: List<FuturesPositionDto> = emptyList(),
+    /** USD->PHP rate for the unrealized-PnL PHP equivalent on open position cards. */
+    val usdToPhpRate: Double? = null,
     val isSubmitting: Boolean = false,
     val isLoading: Boolean = false,
     val confirmLive: Boolean = false,
@@ -215,10 +217,14 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
                 // it never opened when this call alone happened to fail (e.g. rate limit).
                 val positionsResult = runCatching { repo.getFuturesPositions() }
                 val positions = positionsResult.getOrDefault(_uiState.value.positions)
+                // usdToPhpRate is just a currency rate from /status — best-effort, and kept
+                // on a failed fetch instead of flickering to null (it rarely changes anyway).
+                val usdToPhpRate = runCatching { repo.getStatus().usdToPhpRate }.getOrNull() ?: _uiState.value.usdToPhpRate
                 _uiState.value = _uiState.value.copy(
                     mode = balanceResponse?.mode ?: _uiState.value.mode,
                     balance = balanceResponse?.balance,
                     positions = positions,
+                    usdToPhpRate = usdToPhpRate,
                     isLoading = false,
                     error = positionsResult.exceptionOrNull()?.toUserMessage()
                 )
