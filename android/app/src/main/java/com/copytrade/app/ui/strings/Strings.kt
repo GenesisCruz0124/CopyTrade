@@ -221,6 +221,11 @@ object Strings {
     val availableBalance = Bi("Available balance", "Available na balance")
     val openPosition = Bi("Open position", "Buksan ang position")
     val closePosition = Bi("Close", "Isara")
+    val closePositionConfirmTitle = Bi("Close position?", "Isara ang position?")
+    val closePositionConfirmMessage = Bi(
+        "This closes the position at the current market price. This can't be undone.",
+        "Isasara nito ang position sa kasalukuyang presyo ng market. Hindi na ito mababawi."
+    )
     val openPositions = Bi("Open positions", "Mga bukas na position")
     val noOpenPositions = Bi("No open positions", "Walang bukas na position")
     val entryPrice = Bi("Entry", "Entry")

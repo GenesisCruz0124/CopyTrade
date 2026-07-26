@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.CandlestickChart
+import com.copytrade.app.ui.components.ConfirmDialog
 import com.copytrade.app.ui.components.FAST_POLL_INTERVAL_MS
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
@@ -440,6 +441,7 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
 
 @Composable
 internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
+    var showCloseConfirm by remember { mutableStateOf(false) }
     val pnlUsdt = position.unrealizedPnlUsdt
     val pnlPercent = position.unrealizedPnlPercent
     val pnlColor = when {
@@ -521,9 +523,23 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit) {
                     )
                 }
             }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            OutlinedButton(onClick = { showCloseConfirm = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text(Strings.closePosition.resolve(), color = LossRed)
             }
         }
+    }
+
+    if (showCloseConfirm) {
+        ConfirmDialog(
+            title = Strings.closePositionConfirmTitle,
+            message = Strings.closePositionConfirmMessage,
+            confirmLabel = Strings.closePosition,
+            cancelLabel = Strings.cancel,
+            onConfirm = {
+                showCloseConfirm = false
+                onClose()
+            },
+            onDismiss = { showCloseConfirm = false }
+        )
     }
 }
