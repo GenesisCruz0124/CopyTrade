@@ -152,6 +152,7 @@ object Strings {
         "This will open a real futures position sized from your copy-trading budget.",
         "Magbubukas ito ng totoong futures position gamit ang iyong copy-trading budget."
     )
+    val tapToLoadImage = Bi("Tap to load chart image", "I-tap para i-load ang chart image")
     val signalConfidence = Bi("Confidence", "Confidence")
     val signalPending = Bi("Pending", "Pending")
     val signalExecuted = Bi("Executed", "Naisagawa")
