@@ -37,12 +37,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.remote.dto.OrderDto
+import com.copytrade.app.ui.bots.statusLabel
 import com.copytrade.app.ui.components.CandlestickChart
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
+import com.copytrade.app.ui.theme.PaperOrange
 import com.copytrade.app.ui.theme.ProfitGreen
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
 import com.patrykandpatrick.vico.compose.chart.Chart
@@ -87,6 +92,7 @@ fun BotDetailScreen(botId: String, onBack: () -> Unit) {
         ) {
             item { ConfigSummaryCard(state) }
             item { ControlsRow(viewModel) }
+            state.error?.let { error -> item { Text(error, color = LossRed) } }
             item { PnlChartCard(state) }
             item { KlineChartCard(state) }
             item {
@@ -115,12 +121,25 @@ fun BotDetailScreen(botId: String, onBack: () -> Unit) {
     }
 }
 
+/** Scalp bots size their budget cap as riskUsdAmount * 1000 (a coarse backstop, not a
+ *  spend limit — see BotManager.create) which reads as a mismatch against what was typed
+ *  when opening the bot, so pull the actual per-trade risk back out of the config to
+ *  clarify it next to that figure. */
+private fun scalpRiskPerTrade(configJson: String): Double? =
+    runCatching { Json.parseToJsonElement(configJson).jsonObject["riskUsdAmount"]?.jsonPrimitive?.content?.toDoubleOrNull() }.getOrNull()
+
 @Composable
 private fun ConfigSummaryCard(state: BotDetailUiState) {
     val bot = state.bot ?: return
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "${bot.symbol} · ${bot.type.uppercase(Locale.US)}", style = MaterialTheme.typography.titleLarge)
+            val statusColor = when (bot.status) {
+                "running" -> ProfitGreen
+                "paused" -> PaperOrange
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(text = statusLabel(bot.status), color = statusColor, style = MaterialTheme.typography.titleMedium)
             state.currentPrice?.let {
                 Text(
                     text = String.format(Locale.US, "Current price: %.2f", it),
@@ -129,6 +148,15 @@ private fun ConfigSummaryCard(state: BotDetailUiState) {
                 )
             }
             Text(text = "Budget: ${bot.allocatedUsdt} USDT", style = MaterialTheme.typography.bodyMedium)
+            if (bot.type == "futures_scalp") {
+                scalpRiskPerTrade(bot.configJson)?.let { risk ->
+                    Text(
+                        text = "Risk per trade: $${"%.2f".format(risk)} — the budget above is a coarse cap, not what you typed",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
             val pnlColor = if (bot.realizedPnlUsdt >= 0) ProfitGreen else LossRed
             Text(
                 text = String.format(Locale.US, "Realized PnL: %+.2f USDT", bot.realizedPnlUsdt),

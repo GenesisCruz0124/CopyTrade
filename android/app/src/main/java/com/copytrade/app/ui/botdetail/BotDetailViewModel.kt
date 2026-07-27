@@ -8,6 +8,7 @@ import com.copytrade.app.data.local.entity.FillEntity
 import com.copytrade.app.data.local.entity.PnlSnapshotEntity
 import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OrderDto
+import com.copytrade.app.data.remote.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,10 +60,11 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
                 _uiState.value = _uiState.value.copy(
                     openOrders = orders,
                     currentPrice = price ?: _uiState.value.currentPrice,
-                    klines = klines ?: _uiState.value.klines
+                    klines = klines ?: _uiState.value.klines,
+                    error = null
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }
@@ -77,7 +79,7 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
                 app.repositoryFor(url).deleteBot(botId)
                 onDeleted()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }
@@ -89,7 +91,7 @@ class BotDetailViewModel(private val app: CopyTradeApp, private val botId: Strin
                 action(app.repositoryFor(url))
                 refresh()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
             }
         }
     }
