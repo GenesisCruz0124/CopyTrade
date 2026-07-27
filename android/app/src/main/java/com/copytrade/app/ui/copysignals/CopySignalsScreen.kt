@@ -1,6 +1,7 @@
 package com.copytrade.app.ui.copysignals
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +32,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -183,20 +187,41 @@ private fun CopySignalCard(
     val app = LocalContext.current.applicationContext as CopyTradeApp
     val imageLoader = remember { coil.ImageLoader.Builder(app).okHttpClient { buildAuthenticatedHttpClient(app.settingsRepository) }.build() }
     val imageUrl = "${serverUrl.trimEnd('/')}/copy-signals/${signal.id}/image"
+    // Deferred until tapped — these are full-size source screenshots, and fetching one
+    // per card on every list load was the slowest part of rendering the signals list.
+    var imageRequested by remember(signal.id) { mutableStateOf(false) }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             if (signal.imagePath != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(app).data(imageUrl).crossfade(true).build(),
-                    imageLoader = imageLoader,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .padding(bottom = 12.dp)
-                )
+                if (imageRequested) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(app).data(imageUrl).crossfade(true).build(),
+                        imageLoader = imageLoader,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .padding(bottom = 12.dp)
+                    )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .padding(bottom = 12.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                            .clickable { imageRequested = true }
+                    ) {
+                        Text(
+                            text = Strings.tapToLoadImage.resolve(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
             }
 
             Row(
