@@ -5,6 +5,7 @@ import com.copytrade.app.data.remote.dto.BotsResponseDto
 import com.copytrade.app.data.remote.dto.CopySignalResponseDto
 import com.copytrade.app.data.remote.dto.CopySignalsResponseDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
+import com.copytrade.app.data.remote.dto.CreateFuturesScalpBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.EventsResponseDto
 import com.copytrade.app.data.remote.dto.FuturesBalanceResponseDto
@@ -64,6 +65,9 @@ interface ApiService {
 
     @POST("bots")
     suspend fun createDcaBot(@Body request: CreateDcaBotRequest): BotResponseDto
+
+    @POST("bots")
+    suspend fun createFuturesScalpBot(@Body request: CreateFuturesScalpBotRequest): BotResponseDto
 
     @POST("bots/{id}/start")
     suspend fun startBot(@Path("id") id: String): BotResponseDto

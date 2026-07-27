@@ -7,7 +7,8 @@ import { GridStrategy } from "./strategies/grid/gridStrategy.js";
 import { DcaStrategy } from "./strategies/dca/dcaStrategy.js";
 import { FuturesGridStrategy } from "./strategies/grid/futuresGridStrategy.js";
 import { FuturesDcaStrategy } from "./strategies/dca/futuresDcaStrategy.js";
-import type { GridConfig, DcaConfig } from "./strategies/types.js";
+import { FuturesScalpStrategy } from "./strategies/scalp/futuresScalpStrategy.js";
+import type { GridConfig, DcaConfig, ScalpConfig } from "./strategies/types.js";
 import { isLiveMode } from "./config/env.js";
 import type { FuturesExchangeClient } from "./mexcFutures/futuresExchangeClient.js";
 import type { FuturesTradingService } from "./mexcFutures/FuturesTradingService.js";
@@ -15,7 +16,7 @@ import { logger } from "./logger.js";
 
 export interface BotRecord {
   id: string;
-  type: "grid" | "dca" | "futures_grid" | "futures_dca";
+  type: "grid" | "dca" | "futures_grid" | "futures_dca" | "futures_scalp";
   symbol: string;
   status: "running" | "paused" | "stopped";
   config: Record<string, unknown>;
@@ -28,7 +29,7 @@ export interface BotRecord {
   updatedAt: number;
 }
 
-type AnyStrategy = GridStrategy | DcaStrategy | FuturesGridStrategy | FuturesDcaStrategy;
+type AnyStrategy = GridStrategy | DcaStrategy | FuturesGridStrategy | FuturesDcaStrategy | FuturesScalpStrategy;
 
 interface BotEntry {
   record: BotRecord;
@@ -95,7 +96,7 @@ export class BotManager {
     try {
       if (strategy instanceof GridStrategy || strategy instanceof FuturesGridStrategy) {
         strategy.start().catch((err) => this.handleResumeFailure(record, err));
-      } else if (strategy instanceof DcaStrategy || strategy instanceof FuturesDcaStrategy) {
+      } else if (strategy instanceof DcaStrategy || strategy instanceof FuturesDcaStrategy || strategy instanceof FuturesScalpStrategy) {
         strategy.start();
       }
     } catch (err) {
@@ -122,14 +123,23 @@ export class BotManager {
     if (isLiveMode() && !input.confirmLive) {
       throw new Error("Live trading requires confirmLive: true on the bot config");
     }
-    if ((input.type === "futures_grid" || input.type === "futures_dca") && !this.futures) {
+    if ((input.type === "futures_grid" || input.type === "futures_dca" || input.type === "futures_scalp") && !this.futures) {
       throw new Error("Futures trading is not configured on this engine (missing MEXC futures API credentials)");
     }
 
     const id = randomUUID();
     const now = Date.now();
+    // Budget-cap heuristic per type: grid caps at its fixed budget; DCA gets 100x headroom
+    // since it re-buys forever and the safety check never nets down closed positions; scalp
+    // round-trips even more often than DCA, so it gets a coarser 1000x backstop — the real
+    // risk controls for a scalp bot are its fixed per-trade riskUsdAmount and dailyLossLimitUsdt,
+    // both enforced precisely elsewhere, not this budget cap.
     const allocatedUsdt =
-      input.type === "grid" || input.type === "futures_grid" ? input.totalBudgetUsdt : input.amountUsdt * 100;
+      input.type === "grid" || input.type === "futures_grid"
+        ? input.totalBudgetUsdt
+        : input.type === "futures_scalp"
+          ? input.riskUsdAmount * 1000
+          : input.amountUsdt * 100;
 
     const record: BotRecord = {
       id,
@@ -209,6 +219,15 @@ export class BotManager {
           futuresTrading: this.futures.futuresTrading
         });
       }
+      case "futures_scalp": {
+        if (!this.futures) throw new Error("Futures trading is not configured on this engine");
+        return new FuturesScalpStrategy(record.id, record.config as unknown as ScalpConfig, {
+          db: this.db,
+          futuresClient: this.futures.futuresClient,
+          futuresTrading: this.futures.futuresTrading,
+          safety: this.safety
+        });
+      }
     }
   }
 
@@ -236,19 +255,19 @@ export class BotManager {
 
   pause(botId: string): void {
     const entry = this.requireBot(botId);
-    if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
+    if (this.hasOwnTimer(entry.strategy)) entry.strategy.stop();
     this.setStatus(botId, "paused");
   }
 
   stop(botId: string): void {
     const entry = this.requireBot(botId);
-    if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
+    if (this.hasOwnTimer(entry.strategy)) entry.strategy.stop();
     this.setStatus(botId, "stopped");
   }
 
   remove(botId: string): void {
     const entry = this.requireBot(botId);
-    if (entry.strategy instanceof DcaStrategy || entry.strategy instanceof FuturesDcaStrategy) entry.strategy.stop();
+    if (this.hasOwnTimer(entry.strategy)) entry.strategy.stop();
 
     // orders/fills/pnl_snapshots/events all carry a foreign key on bot_id (foreign_keys=ON),
     // so the bot row can't be deleted until anything referencing it is gone first.
@@ -283,6 +302,17 @@ export class BotManager {
 
   getPnlSeries(botId: string) {
     return this.db.prepare(`SELECT * FROM pnl_snapshots WHERE bot_id = ? ORDER BY created_at ASC`).all(botId);
+  }
+
+  /** Strategies that self-schedule (a cron task or setInterval) rather than relying purely
+   *  on the shared reconcileAll cadence — their timer must be cleared on pause/stop/remove
+   *  or they keep ticking (and, for scalp, keep trading) after the bot is no longer "running". */
+  private hasOwnTimer(
+    strategy: AnyStrategy
+  ): strategy is DcaStrategy | FuturesDcaStrategy | FuturesScalpStrategy {
+    return (
+      strategy instanceof DcaStrategy || strategy instanceof FuturesDcaStrategy || strategy instanceof FuturesScalpStrategy
+    );
   }
 
   private setStatus(botId: string, status: BotRecord["status"]): void {
