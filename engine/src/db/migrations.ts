@@ -198,6 +198,21 @@ export function runMigrations(db: Database.Database): void {
   // Must run after the user_id backfill above — it copies bots.user_id, which needs
   // to already exist as a real column on every possible predecessor schema shape.
   migrateBotsTableForScalp(db);
+  // Both bots-table rebuilds above rename "bots" to "bots_old" mid-migration, and
+  // SQLite auto-updates OTHER tables' FOREIGN KEY clauses to follow that rename —
+  // so orders/fills/pnl_snapshots/events end up with a dangling "REFERENCES bots_old"
+  // once bots_old is dropped, breaking every insert/delete against them ("no such
+  // table: main.bots_old") until repaired. Must run after both rebuilds above.
+  repairDanglingBotsOldForeignKeys(db);
+  // The repair above rebuilds tables via drop+recreate when it has work to do, which
+  // drops their indexes too — cheap to reassert unconditionally regardless of whether
+  // it actually ran anything.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_orders_bot_id ON orders(bot_id);
+    CREATE INDEX IF NOT EXISTS idx_fills_bot_id ON fills(bot_id);
+    CREATE INDEX IF NOT EXISTS idx_pnl_bot_id ON pnl_snapshots(bot_id);
+    CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
+  `);
   // Archiving: hides a signal from the default feed without changing its status
   // (unlike REJECTED, which is terminal) — archived_at is nullable, so existing
   // databases predating this column just backfill everyone as "not archived".
@@ -237,33 +252,42 @@ function migrateBotsTableForFutures(db: Database.Database): void {
   const hasMarketColumn = columns.some((c) => c.name === "market");
   if (hasMarketColumn) return;
 
-  db.transaction(() => {
-    db.exec(`ALTER TABLE bots RENAME TO bots_old`);
-    db.exec(`
-      CREATE TABLE bots (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca')),
-        symbol TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
-        config TEXT NOT NULL,
-        state TEXT NOT NULL DEFAULT '{}',
-        confirm_live INTEGER NOT NULL DEFAULT 0,
-        allocated_usdt REAL NOT NULL DEFAULT 0,
-        daily_loss_limit_usdt REAL,
-        realized_pnl_usdt REAL NOT NULL DEFAULT 0,
-        market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
-        leverage REAL,
-        margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )
-    `);
-    db.exec(`
-      INSERT INTO bots (id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at)
-      SELECT id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at FROM bots_old
-    `);
-    db.exec(`DROP TABLE bots_old`);
-  })();
+  // Dropping bots_old while orders/fills/pnl_snapshots/events still have rows
+  // referencing it (a real bot with order history) violates their FK unless
+  // enforcement is off for this rebuild — repairDanglingBotsOldForeignKeys()
+  // fixes up the dangling "REFERENCES bots_old" those tables are left with.
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(`ALTER TABLE bots RENAME TO bots_old`);
+      db.exec(`
+        CREATE TABLE bots (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca')),
+          symbol TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
+          config TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT '{}',
+          confirm_live INTEGER NOT NULL DEFAULT 0,
+          allocated_usdt REAL NOT NULL DEFAULT 0,
+          daily_loss_limit_usdt REAL,
+          realized_pnl_usdt REAL NOT NULL DEFAULT 0,
+          market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
+          leverage REAL,
+          margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+      db.exec(`
+        INSERT INTO bots (id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at)
+        SELECT id, type, symbol, status, config, state, confirm_live, allocated_usdt, daily_loss_limit_usdt, realized_pnl_usdt, created_at, updated_at FROM bots_old
+      `);
+      db.exec(`DROP TABLE bots_old`);
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
 }
 
 /**
@@ -278,36 +302,86 @@ function migrateBotsTableForScalp(db: Database.Database): void {
     | undefined;
   if (!row || row.sql.includes("futures_scalp")) return;
 
-  db.transaction(() => {
-    db.exec(`ALTER TABLE bots RENAME TO bots_old`);
-    db.exec(`
-      CREATE TABLE bots (
-        id TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES users(id),
-        type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca', 'futures_scalp')),
-        symbol TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
-        config TEXT NOT NULL,
-        state TEXT NOT NULL DEFAULT '{}',
-        confirm_live INTEGER NOT NULL DEFAULT 0,
-        allocated_usdt REAL NOT NULL DEFAULT 0,
-        daily_loss_limit_usdt REAL,
-        realized_pnl_usdt REAL NOT NULL DEFAULT 0,
-        market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
-        leverage REAL,
-        margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )
-    `);
-    db.exec(`
-      INSERT INTO bots (id, user_id, type, symbol, status, config, state, confirm_live, allocated_usdt,
-                         daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at)
-      SELECT id, user_id, type, symbol, status, config, state, confirm_live, allocated_usdt,
-             daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at
-      FROM bots_old
-    `);
-    db.exec(`DROP TABLE bots_old`);
-  })();
+  // See migrateBotsTableForFutures above: dropping bots_old while orders/fills/
+  // pnl_snapshots/events still reference it violates their FK unless enforcement
+  // is off for this rebuild too.
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(`ALTER TABLE bots RENAME TO bots_old`);
+      db.exec(`
+        CREATE TABLE bots (
+          id TEXT PRIMARY KEY,
+          user_id TEXT REFERENCES users(id),
+          type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca', 'futures_scalp')),
+          symbol TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
+          config TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT '{}',
+          confirm_live INTEGER NOT NULL DEFAULT 0,
+          allocated_usdt REAL NOT NULL DEFAULT 0,
+          daily_loss_limit_usdt REAL,
+          realized_pnl_usdt REAL NOT NULL DEFAULT 0,
+          market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
+          leverage REAL,
+          margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+      db.exec(`
+        INSERT INTO bots (id, user_id, type, symbol, status, config, state, confirm_live, allocated_usdt,
+                           daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at)
+        SELECT id, user_id, type, symbol, status, config, state, confirm_live, allocated_usdt,
+               daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at
+        FROM bots_old
+      `);
+      db.exec(`DROP TABLE bots_old`);
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
   db.exec(`CREATE INDEX IF NOT EXISTS idx_bots_user_id ON bots(user_id)`);
+}
+
+/**
+ * Rebuilding "bots" (above) renames it to "bots_old" mid-migration; SQLite auto-updates
+ * FOREIGN KEY clauses in OTHER tables that reference the renamed table to follow it, so
+ * orders/fills/pnl_snapshots/events end up literally declaring "REFERENCES bots_old(id)".
+ * That's fine right up until bots_old is dropped, after which those tables reference a
+ * table that no longer exists — every insert/delete against them then fails with
+ * "no such table: main.bots_old". This detects any table still carrying that dangling
+ * reference and rebuilds it pointing at the real "bots" table, preserving all rows.
+ */
+function repairDanglingBotsOldForeignKeys(db: Database.Database): void {
+  const tableSql = (table: string): string | undefined =>
+    (db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`).get(table) as { sql: string } | undefined)?.sql;
+
+  const broken = ["orders", "fills", "pnl_snapshots", "events"].filter((table) => tableSql(table)?.includes("bots_old"));
+  if (broken.length === 0) return;
+
+  // Foreign key enforcement can't be toggled inside a transaction, and rebuilding one
+  // broken table transiently drops a table another still (correctly) references (e.g.
+  // fills.order_id -> orders while orders itself is mid-rebuild) — must be off for the
+  // whole repair, then back on and verified via foreign_key_check before returning.
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      for (const table of broken) {
+        const sql = tableSql(table)!;
+        const rebuildSql = sql.replace(/bots_old/g, "bots").replace(new RegExp(`CREATE TABLE\\s+"?${table}"?`), `CREATE TABLE ${table}_new`);
+        db.exec(rebuildSql);
+        db.exec(`INSERT INTO ${table}_new SELECT * FROM ${table}`);
+        db.exec(`DROP TABLE ${table}`);
+        db.exec(`ALTER TABLE ${table}_new RENAME TO ${table}`);
+      }
+    })();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+
+  const violations = db.pragma("foreign_key_check") as unknown[];
+  if (violations.length > 0) {
+    throw new Error(`repairDanglingBotsOldForeignKeys left ${violations.length} foreign key violation(s)`);
+  }
 }
