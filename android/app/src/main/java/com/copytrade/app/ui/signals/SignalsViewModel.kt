@@ -37,11 +37,27 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
 
     init {
         loadSymbols()
+        loadMode()
         // Seed the pair from the last futures symbol so the two screens feel linked.
         // The futures symbol uses "_" (e.g. BTC_USDT) while spot pairs don't, so strip it.
         viewModelScope.launch {
             val symbol = app.settingsRepository.futuresSymbol.first().replace("_", "")
             if (symbol.isNotBlank()) selectSymbol(symbol)
+        }
+    }
+
+    /** The PAPER/LIVE badge reflects the account's spot trading mode — was never
+     *  actually fetched, so it silently stuck on the "paper" default forever
+     *  regardless of what the account was really set to. */
+    private fun loadMode() {
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                val mode = app.repositoryFor(url).getStatus().mode
+                _uiState.value = _uiState.value.copy(mode = mode)
+            } catch (_: Exception) {
+                // Best-effort — the badge just keeps showing its last known value.
+            }
         }
     }
 
@@ -80,6 +96,7 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
      *  transient failure (e.g. a slow connection) leaves the price stuck showing
      *  "Loading…" forever instead of eventually resolving. */
     fun refreshCurrentSelection() {
+        loadMode()
         if (_uiState.value.selectedSymbol.isBlank()) return
         if (_uiState.value.currentPrice == null) refreshPrice()
         if (_uiState.value.klines.isEmpty()) refreshKlines()
