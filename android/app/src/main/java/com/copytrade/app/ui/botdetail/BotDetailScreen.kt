@@ -147,15 +147,17 @@ private fun ConfigSummaryCard(state: BotDetailUiState) {
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            Text(text = "Budget: ${bot.allocatedUsdt} USDT", style = MaterialTheme.typography.bodyMedium)
             if (bot.type == "futures_scalp") {
-                scalpRiskPerTrade(bot.configJson)?.let { risk ->
-                    Text(
-                        text = "Risk per trade: $${"%.2f".format(risk)} — the budget above is a coarse cap, not what you typed",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                // allocatedUsdt for a scalp bot is riskUsdAmount * 1000, an internal
+                // backstop cap (see BotManager.create) — not a number the user set or
+                // should see. Show the actual per-trade risk they typed instead.
+                val risk = scalpRiskPerTrade(bot.configJson)
+                Text(
+                    text = risk?.let { "Risk per trade: $${"%.2f".format(it)}" } ?: "Budget: ${bot.allocatedUsdt} USDT",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                Text(text = "Budget: ${bot.allocatedUsdt} USDT", style = MaterialTheme.typography.bodyMedium)
             }
             val pnlColor = if (bot.realizedPnlUsdt >= 0) ProfitGreen else LossRed
             Text(
