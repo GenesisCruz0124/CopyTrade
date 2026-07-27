@@ -225,6 +225,34 @@ export class FuturesPositionManager {
     };
   }
 
+  /**
+   * Sets (or replaces) an open position's take-profit target expressed as % PnL on
+   * margin (ROE) — the same metric shown on the position card as unrealizedPnlPercent —
+   * rather than the price-move percent OpenPositionInput.takeProfitPercent uses. Converts
+   * via the leverage relationship (unrealizedPnlPercent = leverage * priceMovePercent, see
+   * attachLivePnl) so "10% PnL" means the card actually reads +10% when it fires, regardless
+   * of leverage. Anchored to entry_price, same as the open-time TP so it's a fixed target,
+   * not one that drifts if called again before the price moves.
+   */
+  async setTakeProfitByPnlPercent(positionId: string, pnlPercent: number): Promise<FuturesPositionRow> {
+    if (pnlPercent <= 0) throw new Error("take-profit PnL percent must be greater than 0");
+    const row = this.db.prepare(`SELECT * FROM futures_positions WHERE id = ? AND user_id IS ?`).get(positionId, this.userId) as
+      | FuturesPositionRow
+      | undefined;
+    if (!row) throw new Error(`position ${positionId} not found`);
+    if (row.status === "closed") throw new Error(`position ${positionId} is already closed`);
+
+    const priceMovePercent = pnlPercent / row.leverage;
+    const takeProfitPrice =
+      row.side === "long" ? row.entry_price * (1 + priceMovePercent / 100) : row.entry_price * (1 - priceMovePercent / 100);
+    if (takeProfitPrice <= 0) throw new Error("take-profit percent is too large — would result in a non-positive price");
+
+    const now = Date.now();
+    this.db.prepare(`UPDATE futures_positions SET take_profit_price = ?, updated_at = ? WHERE id = ?`).run(takeProfitPrice, now, positionId);
+
+    return { ...row, take_profit_price: takeProfitPrice, updated_at: now };
+  }
+
   async listOpen(): Promise<FuturesPositionView[]> {
     const rows = this.db
       .prepare(`SELECT * FROM futures_positions WHERE status = 'open' AND user_id IS ? ORDER BY created_at DESC`)

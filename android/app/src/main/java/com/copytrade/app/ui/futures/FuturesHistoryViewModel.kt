@@ -79,6 +79,20 @@ class FuturesHistoryViewModel(private val app: CopyTradeApp) : ViewModel() {
         }
     }
 
+    /** Sets an already-open position's take-profit target as % PnL on margin (ROE) —
+     *  the same number shown on the position card — so it auto-closes once reached. */
+    fun setTakeProfit(id: String, pnlPercent: Double) {
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                app.repositoryFor(url).setFuturesTakeProfit(id, pnlPercent)
+                refresh()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
+            }
+        }
+    }
+
     fun cancelOrder(id: String) {
         viewModelScope.launch {
             try {

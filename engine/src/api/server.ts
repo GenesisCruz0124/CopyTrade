@@ -544,6 +544,22 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     }
   });
 
+  app.post<{ Params: { id: string }; Body: { pnlPercent?: number } }>("/futures/positions/:id/take-profit", async (req, reply) => {
+    const runtime = getFuturesRuntimeOrReply(deps, req, reply);
+    if (!runtime) return;
+    const pnlPercent = req.body?.pnlPercent;
+    if (typeof pnlPercent !== "number" || !Number.isFinite(pnlPercent) || pnlPercent <= 0) {
+      reply.code(400).send({ mode: runtime.mode, error: "pnlPercent must be a positive number" });
+      return;
+    }
+    try {
+      const position = await runtime.positions.setTakeProfitByPnlPercent(req.params.id, pnlPercent);
+      reply.send({ mode: runtime.mode, position });
+    } catch (err) {
+      reply.code(400).send({ mode: runtime.mode, error: String(err instanceof Error ? err.message : err) });
+    }
+  });
+
   app.post<{ Params: { id: string } }>("/futures/positions/:id/close", async (req, reply) => {
     const runtime = getFuturesRuntimeOrReply(deps, req, reply);
     if (!runtime) return;

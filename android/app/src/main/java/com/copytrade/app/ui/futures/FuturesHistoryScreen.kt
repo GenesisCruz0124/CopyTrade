@@ -90,7 +90,12 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.openPositions, key = { it.id }) { position ->
-                            PositionCard(position = position, onClose = { viewModel.closePosition(position.id) }, phpRate = state.usdToPhpRate)
+                            PositionCard(
+                                position = position,
+                                onClose = { viewModel.closePosition(position.id) },
+                                onSetTakeProfit = { pct -> viewModel.setTakeProfit(position.id, pct) },
+                                phpRate = state.usdToPhpRate
+                            )
                         }
                     }
                 }

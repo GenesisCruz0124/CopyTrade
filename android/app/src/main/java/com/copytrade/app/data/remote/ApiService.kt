@@ -22,6 +22,7 @@ import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
 import com.copytrade.app.data.remote.dto.OrdersResponseDto
 import com.copytrade.app.data.remote.dto.PnlResponseDto
 import com.copytrade.app.data.remote.dto.PriceDto
+import com.copytrade.app.data.remote.dto.SetTakeProfitRequest
 import com.copytrade.app.data.remote.dto.SignalResponseDto
 import com.copytrade.app.data.remote.dto.SpotSymbolsResponseDto
 import com.copytrade.app.data.remote.dto.StatusDto
@@ -143,6 +144,9 @@ interface ApiService {
 
     @POST("futures/positions/{id}/close")
     suspend fun closeFuturesPosition(@Path("id") id: String): FuturesPositionResponseDto
+
+    @POST("futures/positions/{id}/take-profit")
+    suspend fun setFuturesTakeProfit(@Path("id") id: String, @Body request: SetTakeProfitRequest): FuturesPositionResponseDto
 
     @GET("futures/price/{symbol}")
     suspend fun getFuturesPrice(@Path("symbol") symbol: String): FuturesPriceDto

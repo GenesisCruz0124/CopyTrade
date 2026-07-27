@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,6 +44,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -151,7 +153,12 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.positions.forEach { position ->
-                        PositionCard(position = position, onClose = { viewModel.closePosition(position.id) }, phpRate = state.usdToPhpRate)
+                        PositionCard(
+                            position = position,
+                            onClose = { viewModel.closePosition(position.id) },
+                            onSetTakeProfit = { pct -> viewModel.setTakeProfit(position.id, pct) },
+                            phpRate = state.usdToPhpRate
+                        )
                     }
                 }
             }
@@ -469,8 +476,14 @@ private fun StatCell(
 }
 
 @Composable
-internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit, phpRate: Double? = null) {
+internal fun PositionCard(
+    position: FuturesPositionDto,
+    onClose: () -> Unit,
+    onSetTakeProfit: (Double) -> Unit = {},
+    phpRate: Double? = null
+) {
     var showCloseConfirm by remember { mutableStateOf(false) }
+    var showTpDialog by remember { mutableStateOf(false) }
     val pnlUsdt = position.unrealizedPnlUsdt
     val pnlPercent = position.unrealizedPnlPercent
     val pnlColor = when {
@@ -581,15 +594,69 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit, php
                 )
             }
 
-            Button(
-                onClick = { showCloseConfirm = true },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp)
-            ) {
-                Text(Strings.closePosition.resolve(), color = LossRed)
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { showTpDialog = true },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        if (position.takeProfitPrice != null) Strings.editTakeProfit.resolve() else Strings.setTakeProfit.resolve(),
+                        color = ProfitGreen
+                    )
+                }
+                Button(
+                    onClick = { showCloseConfirm = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(Strings.closePosition.resolve(), color = LossRed)
+                }
             }
         }
+    }
+
+    if (showTpDialog) {
+        var tpInput by remember { mutableStateOf("10") }
+        var tpError by remember { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = { showTpDialog = false },
+            title = { Text(Strings.takeProfitDialogTitle.resolve()) },
+            text = {
+                Column {
+                    Text(
+                        Strings.takeProfitDialogMessage.resolve(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = tpInput,
+                        onValueChange = { tpInput = it; tpError = null },
+                        label = { Text(Strings.takeProfitPnlPercentLabel.resolve()) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        isError = tpError != null,
+                        supportingText = tpError?.let { { Text(it, color = LossRed) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val pct = tpInput.toDoubleOrNull()
+                    if (pct == null || pct <= 0) {
+                        tpError = "Enter a number greater than 0"
+                    } else {
+                        onSetTakeProfit(pct)
+                        showTpDialog = false
+                    }
+                }) { Text(Strings.confirm.resolve()) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTpDialog = false }) { Text(Strings.cancel.resolve()) }
+            }
+        )
     }
 
     if (showCloseConfirm) {

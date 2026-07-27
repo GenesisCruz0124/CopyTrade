@@ -23,8 +23,8 @@ android {
         minSdk = 26
         targetSdk = 34
         // versionCode/versionName: bump on every release build per project convention (APK: CopyTrade-vX.X.X.apk)
-        versionCode = 38
-        versionName = "1.16.1"
+        versionCode = 39
+        versionName = "1.17.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
