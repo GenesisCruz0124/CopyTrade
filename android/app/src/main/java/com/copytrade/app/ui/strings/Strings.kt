@@ -239,6 +239,7 @@ object Strings {
     val noPositionHistory = Bi("No closed positions yet", "Wala pang saradong position")
     val closedAtLabel = Bi("Closed", "Sarado")
     val realizedPnlLabel = Bi("Realized PnL", "Realized PnL")
+    val unrealizedPnlLabel = Bi("Unrealized PNL (USDT)", "Unrealized PNL (USDT)")
     val closeReasonManual = Bi("Manual", "Manual")
     val closeReasonTakeProfit = Bi("Take-profit hit", "Naabot ang take-profit")
     val closeReasonStopLoss = Bi("Stop-loss hit", "Naabot ang stop-loss")
