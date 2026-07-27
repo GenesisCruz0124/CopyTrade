@@ -59,7 +59,7 @@ import com.copytrade.app.ui.components.ConfirmDialog
 import com.copytrade.app.ui.components.FAST_POLL_INTERVAL_MS
 import com.copytrade.app.ui.components.ModeBadge
 import com.copytrade.app.ui.components.PollWhileForeground
-import com.copytrade.app.ui.futures.ClosedPositionCard
+import com.copytrade.app.ui.futures.ClosedPositionsList
 import com.copytrade.app.ui.futures.FuturesHistoryViewModel
 import com.copytrade.app.ui.futures.PendingOrderCard
 import com.copytrade.app.ui.futures.PositionCard
@@ -220,11 +220,7 @@ fun DashboardScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(futuresState.closedPositions, key = { it.id }) { position ->
-                                ClosedPositionCard(position = position, phpRate = state.usdToPhpRate)
-                            }
-                        }
+                        ClosedPositionsList(positions = futuresState.closedPositions, phpRate = state.usdToPhpRate)
                     }
                     else -> CopySignalsList(onOpenFutures = onOpenFutures)
                 }
