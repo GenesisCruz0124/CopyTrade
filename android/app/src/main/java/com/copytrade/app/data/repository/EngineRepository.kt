@@ -21,6 +21,7 @@ import com.copytrade.app.data.remote.dto.FuturesSymbolDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
+import com.copytrade.app.data.remote.dto.SetTakeProfitRequest
 import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.data.remote.dto.SpotSymbolDto
 import com.copytrade.app.data.remote.dto.StatusDto
@@ -154,6 +155,9 @@ class EngineRepository(
     suspend fun openFuturesPosition(request: OpenFuturesPositionRequest) = api.openFuturesPosition(request)
 
     suspend fun closeFuturesPosition(id: String): FuturesPositionDto? = api.closeFuturesPosition(id).position
+
+    suspend fun setFuturesTakeProfit(id: String, pnlPercent: Double): FuturesPositionDto? =
+        api.setFuturesTakeProfit(id, SetTakeProfitRequest(pnlPercent)).position
 
     suspend fun getFuturesPositionsHistory(): List<FuturesPositionDto> = api.getFuturesPositionsHistory().positions
 

@@ -196,7 +196,12 @@ fun DashboardScreen(
                     } else {
                         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(futuresState.openPositions, key = { it.id }) { position ->
-                                PositionCard(position = position, onClose = { futuresViewModel.closePosition(position.id) }, phpRate = state.usdToPhpRate)
+                                PositionCard(
+                                    position = position,
+                                    onClose = { futuresViewModel.closePosition(position.id) },
+                                    onSetTakeProfit = { pct -> futuresViewModel.setTakeProfit(position.id, pct) },
+                                    phpRate = state.usdToPhpRate
+                                )
                             }
                         }
                     }

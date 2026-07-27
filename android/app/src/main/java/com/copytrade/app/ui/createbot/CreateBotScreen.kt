@@ -5,13 +5,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,9 +33,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.copytrade.app.data.remote.dto.FuturesSymbolDto
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -83,7 +95,7 @@ fun CreateBotScreen(onBack: () -> Unit, onCreated: () -> Unit) {
             when (state.strategyKind) {
                 StrategyKind.GRID -> GridForm(state.grid, viewModel::updateGrid)
                 StrategyKind.DCA -> DcaForm(state.dca, viewModel::updateDca)
-                StrategyKind.FUTURES_SCALP -> ScalpForm(state.scalp, viewModel::updateScalp)
+                StrategyKind.FUTURES_SCALP -> ScalpForm(state.scalp, state.futuresSymbols, viewModel::updateScalp)
             }
 
             if (state.isLiveMode) {
@@ -215,13 +227,50 @@ private fun DcaForm(form: DcaFormState, update: ((DcaFormState) -> DcaFormState)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ScalpForm(form: ScalpFormState, update: ((ScalpFormState) -> ScalpFormState) -> Unit) {
+private fun ScalpForm(
+    form: ScalpFormState,
+    futuresSymbols: List<FuturesSymbolDto>,
+    update: ((ScalpFormState) -> ScalpFormState) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val filteredSymbols = remember(futuresSymbols, form.symbol) {
+        val query = form.symbol.trim()
+        if (query.isBlank()) futuresSymbols else futuresSymbols.filter { it.symbol.contains(query) }
+    }.take(50)
+
+    // Same inline-list-below-field pattern as the manual Futures screen's pair picker —
+    // a popup menu here would flip above the field and get covered by the keyboard.
     OutlinedTextField(
         value = form.symbol,
-        onValueChange = { v -> update { it.copy(symbol = v.uppercase()) } },
+        onValueChange = { v -> update { it.copy(symbol = v.uppercase()) }; expanded = true },
         label = { Text(Strings.symbol.resolve()) },
-        modifier = Modifier.fillMaxWidth()
+        trailingIcon = {
+            IconButton(onClick = { expanded = !expanded }) {
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { focus -> if (focus.isFocused) expanded = true }
     )
+    if (expanded && filteredSymbols.isNotEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        ) {
+            LazyColumn {
+                items(filteredSymbols, key = { it.symbol }) { symbol ->
+                    DropdownMenuItem(
+                        text = { Text("${symbol.symbol} (max ${symbol.maxLeverage.toInt()}x)") },
+                        onClick = {
+                            update { it.copy(symbol = symbol.symbol) }
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
     OutlinedTextField(
         value = form.leverage,
         onValueChange = { v -> update { it.copy(leverage = v) } },

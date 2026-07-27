@@ -355,6 +355,11 @@ data class FuturesPositionResponseDto(
 )
 
 @Serializable
+data class SetTakeProfitRequest(
+    val pnlPercent: Double
+)
+
+@Serializable
 data class OpenFuturesPositionRequest(
     val symbol: String,
     val side: String,

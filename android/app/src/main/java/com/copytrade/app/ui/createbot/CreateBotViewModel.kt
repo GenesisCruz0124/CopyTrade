@@ -6,6 +6,8 @@ import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
 import com.copytrade.app.data.remote.dto.CreateFuturesScalpBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
+import com.copytrade.app.data.remote.dto.FuturesSymbolDto
+import com.copytrade.app.data.remote.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +68,7 @@ data class CreateBotUiState(
     val grid: GridFormState = GridFormState(),
     val dca: DcaFormState = DcaFormState(),
     val scalp: ScalpFormState = ScalpFormState(),
+    val futuresSymbols: List<FuturesSymbolDto> = emptyList(),
     val confirmLive: Boolean = false,
     val isLiveMode: Boolean = false,
     val isSubmitting: Boolean = false,
@@ -86,6 +89,12 @@ class CreateBotViewModel(private val app: CopyTradeApp) : ViewModel() {
                 val status = app.repositoryFor(url).getStatus()
                 _uiState.value = _uiState.value.copy(isLiveMode = status.mode == "live")
             } catch (_: Exception) {
+            }
+            try {
+                val symbols = app.repositoryFor(url).getFuturesSymbols()
+                _uiState.value = _uiState.value.copy(futuresSymbols = symbols)
+            } catch (_: Exception) {
+                // Typing the symbol manually still works without the picker list.
             }
         }
     }
@@ -164,7 +173,7 @@ class CreateBotViewModel(private val app: CopyTradeApp) : ViewModel() {
                 }
                 _uiState.value = _uiState.value.copy(isSubmitting = false, created = true)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isSubmitting = false, error = e.message)
+                _uiState.value = _uiState.value.copy(isSubmitting = false, error = e.toUserMessage())
             }
         }
     }

@@ -51,7 +51,9 @@ data class FuturesUiState(
     val amountUsd: String = "",
     val percentOfBalance: String = "",
     val takeProfitInputMode: TpInputMode = TpInputMode.PERCENT,
-    val takeProfitPercent: String = "",
+    // Defaults to 10 so a new position always opens with a take-profit set unless
+    // the user clears it — was blank, meaning most positions had no TP at all.
+    val takeProfitPercent: String = "10",
     val takeProfitPriceUsd: String = "",
     val takeProfitPriceError: String? = null,
     val stopLossInputMode: SlInputMode = SlInputMode.PERCENT,
@@ -562,6 +564,20 @@ class FuturesViewModel(private val app: CopyTradeApp) : ViewModel() {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
                 app.repositoryFor(url).closeFuturesPosition(id)
+                refresh()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.toUserMessage())
+            }
+        }
+    }
+
+    /** Sets an already-open position's take-profit target as % PnL on margin (ROE) —
+     *  the same number shown on the position card — so it auto-closes once reached. */
+    fun setTakeProfit(id: String, pnlPercent: Double) {
+        viewModelScope.launch {
+            try {
+                val url = app.settingsRepository.serverUrl.first() ?: return@launch
+                app.repositoryFor(url).setFuturesTakeProfit(id, pnlPercent)
                 refresh()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.toUserMessage())
