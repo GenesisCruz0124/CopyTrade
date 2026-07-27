@@ -54,6 +54,7 @@ import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.ui.appViewModel
 import com.copytrade.app.ui.components.CandlestickChart
 import com.copytrade.app.ui.components.ModeBadge
+import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
 import com.copytrade.app.ui.theme.LossRed
@@ -71,6 +72,8 @@ fun SignalsScreen(onBack: () -> Unit, onTradeSignal: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
+
+    PollWhileForeground { viewModel.refreshCurrentSelection() }
     val filteredSymbols = remember(state.symbols, state.symbolQuery) {
         if (state.symbolQuery.isBlank()) {
             state.symbols

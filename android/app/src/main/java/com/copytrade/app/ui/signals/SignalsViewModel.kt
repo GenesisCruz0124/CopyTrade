@@ -75,6 +75,16 @@ class SignalsViewModel(private val app: CopyTradeApp) : ViewModel() {
         refreshKlines()
     }
 
+    /** Retries the price/kline fetch for whichever pair is currently selected — both
+     *  are best-effort and never surface an error, so without a retry a single
+     *  transient failure (e.g. a slow connection) leaves the price stuck showing
+     *  "Loading…" forever instead of eventually resolving. */
+    fun refreshCurrentSelection() {
+        if (_uiState.value.selectedSymbol.isBlank()) return
+        if (_uiState.value.currentPrice == null) refreshPrice()
+        if (_uiState.value.klines.isEmpty()) refreshKlines()
+    }
+
     private fun refreshPrice() {
         val symbol = _uiState.value.selectedSymbol
         if (symbol.isBlank()) return

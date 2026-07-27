@@ -96,10 +96,17 @@ export class FuturesPendingOrderManager {
       throw new Error(`leverage ${input.leverage}x exceeds contract max ${detail.maxLeverage}x`);
     }
 
-    const deviationPct = (Math.abs(input.limitPrice - ticker.fairPrice) / ticker.fairPrice) * 100;
+    // The requested price rarely lands on a multiple of the contract's tick size —
+    // e.g. a signal's suggested entry is derived from spot candle closes, which have
+    // no relationship to a futures contract's priceUnit. Sending it to MEXC unrounded
+    // is exactly what produces "error code=2015: Price or quantity precision error".
+    const limitPrice = floorToStep(input.limitPrice, detail.priceUnit);
+    if (limitPrice <= 0) throw new Error("limit price rounds to zero at this contract's price precision");
+
+    const deviationPct = (Math.abs(limitPrice - ticker.fairPrice) / ticker.fairPrice) * 100;
     if (deviationPct > MAX_LIMIT_PRICE_DEVIATION_PCT) {
       throw new Error(
-        `limit price ${input.limitPrice} deviates ${deviationPct.toFixed(1)}% from the current price ${ticker.fairPrice} — refusing (max ${MAX_LIMIT_PRICE_DEVIATION_PCT}%)`
+        `limit price ${limitPrice} deviates ${deviationPct.toFixed(1)}% from the current price ${ticker.fairPrice} — refusing (max ${MAX_LIMIT_PRICE_DEVIATION_PCT}%)`
       );
     }
 
@@ -113,7 +120,7 @@ export class FuturesPendingOrderManager {
     if (marginUsdt <= 0) throw new Error("computed margin amount is zero or negative");
 
     const notional = marginUsdt * input.leverage;
-    const rawQty = notional / (input.limitPrice * detail.contractSize);
+    const rawQty = notional / (limitPrice * detail.contractSize);
     const qty = floorToStep(rawQty, detail.volUnit || 1);
     if (qty < detail.minVol) throw new Error(`sized quantity ${qty} below contract minVol ${detail.minVol}`);
     if (qty > detail.maxVol) throw new Error(`sized quantity ${qty} exceeds contract maxVol ${detail.maxVol}`);
@@ -126,7 +133,7 @@ export class FuturesPendingOrderManager {
       side: input.side,
       leverage: input.leverage,
       openType: input.openType,
-      entryPrice: input.limitPrice,
+      entryPrice: limitPrice,
       quantity: qty,
       contractSize: detail.contractSize,
       marginUsdt,
@@ -148,7 +155,7 @@ export class FuturesPendingOrderManager {
         leverage: input.leverage,
         openType: input.openType,
         type: "LIMIT",
-        price: input.limitPrice,
+        price: limitPrice,
         externalOid
       });
       orderId = result.orderId;
@@ -169,7 +176,7 @@ export class FuturesPendingOrderManager {
       side: input.side,
       leverage: input.leverage,
       open_type: input.openType,
-      limit_price: input.limitPrice,
+      limit_price: limitPrice,
       quantity: qty,
       contract_size: detail.contractSize,
       sizing_mode: input.sizing.mode,
