@@ -7,11 +7,12 @@ val LiveRed = Color(0xFFDC2626)
 val ProfitGreen = Color(0xFF22C55E)
 val LossRed = Color(0xFFEF4444)
 
-val DarkBackground = Color(0xFF0B0F17)
-val DarkSurface = Color(0xFF131A26)
-val DarkSurfaceVariant = Color(0xFF1C2534)
-val DarkOnSurface = Color(0xFFE5E9F0)
-val DarkOnSurfaceMuted = Color(0xFF8B93A3)
+// Near-black, matching MEXC's futures screen rather than the previous navy tint.
+val DarkBackground = Color(0xFF0B0B0D)
+val DarkSurface = Color(0xFF181A20)
+val DarkSurfaceVariant = Color(0xFF23262F)
+val DarkOnSurface = Color(0xFFEAECEF)
+val DarkOnSurfaceMuted = Color(0xFF848E9C)
 
 val LightBackground = Color(0xFFF7F8FA)
 val LightSurface = Color(0xFFFFFFFF)

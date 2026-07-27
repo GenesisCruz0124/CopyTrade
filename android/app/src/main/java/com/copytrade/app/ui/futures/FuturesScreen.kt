@@ -1,13 +1,18 @@
 package com.copytrade.app.ui.futures
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +24,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -50,8 +56,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.copytrade.app.data.remote.dto.FuturesPositionDto
 import com.copytrade.app.ui.appViewModel
@@ -439,6 +447,27 @@ private fun OpenPositionForm(state: FuturesUiState, viewModel: FuturesViewModel)
     }
 }
 
+/** A single stat in a position card's grid: a small underlined muted label
+ *  above a bold value — mirrors MEXC's futures position card layout. */
+@Composable
+private fun StatCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Column(modifier = modifier) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textDecoration = TextDecoration.Underline
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = valueColor)
+    }
+}
+
 @Composable
 internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit, phpRate: Double? = null) {
     var showCloseConfirm by remember { mutableStateOf(false) }
@@ -452,86 +481,112 @@ internal fun PositionCard(position: FuturesPositionDto, onClose: () -> Unit, php
     }
     val sideColor = if (position.side == "long") ProfitGreen else LossRed
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(position.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "${position.side.uppercase(Locale.US)} ${position.leverage.toInt()}x",
+                    position.side.uppercase(Locale.US),
                     color = sideColor,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${Strings.entryPrice.resolve()}: ${formatPrice(position.entryPrice)}", style = MaterialTheme.typography.bodyMedium)
-                position.currentPrice?.let {
-                    Text("${Strings.currentPriceLabel.resolve()}: ${formatPrice(it)}", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    "${Strings.marginLabel.resolve()}: $${"%.2f".format(position.marginUsdt)} (${position.openType})",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "${Strings.quantityLabel.resolve()}: ${formatPrice(position.quantity)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (position.stopLossPrice != null || position.takeProfitPrice != null) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    position.stopLossPrice?.let {
-                        Text(
-                            "${Strings.signalsStopLoss.resolve()}: ${formatPrice(it)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = LossRed
-                        )
-                    }
-                    position.takeProfitPrice?.let {
-                        Text(
-                            "${Strings.signalsTakeProfit.resolve()}: ${formatPrice(it)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ProfitGreen
-                        )
-                    }
-                }
-            }
-            if (pnlUsdt != null && pnlPercent != null) {
-                val sign = if (pnlUsdt > 0) "+" else if (pnlUsdt < 0) "-" else ""
-                Text(
-                    "$sign$${"%.2f".format(abs(pnlUsdt))} ($sign${"%.2f".format(abs(pnlPercent))}%)",
-                    color = pnlColor,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                phpRate?.let { rate ->
-                    Text(
-                        "$sign₱${"%.2f".format(abs(pnlUsdt) * rate)}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
+            }
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(50))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    "${position.openType.replaceFirstChar { it.uppercase() }} ${position.leverage.toInt()}x",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                Text(
+                    Strings.unrealizedPnlLabel.resolve(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textDecoration = TextDecoration.Underline
+                )
+                if (pnlUsdt != null && pnlPercent != null) {
+                    val sign = if (pnlUsdt > 0) "+" else if (pnlUsdt < 0) "-" else ""
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "$sign$${"%.2f".format(abs(pnlUsdt))} ($sign${"%.2f".format(abs(pnlPercent))}%)",
+                            color = pnlColor,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        phpRate?.let { rate ->
+                            Text(
+                                "$sign₱${"%.2f".format(abs(pnlUsdt) * rate)}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                StatCell(Strings.marginLabel.resolve(), "$${"%.2f".format(position.marginUsdt)}", Modifier.weight(1f))
+                StatCell(Strings.quantityLabel.resolve(), formatPrice(position.quantity), Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                StatCell(Strings.entryPrice.resolve(), formatPrice(position.entryPrice), Modifier.weight(1f))
+                StatCell(
+                    Strings.currentPriceLabel.resolve(),
+                    position.currentPrice?.let { formatPrice(it) } ?: "—",
+                    Modifier.weight(1f)
+                )
+            }
+            if (position.stopLossPrice != null || position.takeProfitPrice != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    StatCell(
+                        Strings.signalsStopLoss.resolve(),
+                        position.stopLossPrice?.let { formatPrice(it) } ?: "—",
+                        Modifier.weight(1f),
+                        valueColor = if (position.stopLossPrice != null) LossRed else MaterialTheme.colorScheme.onSurface
+                    )
+                    StatCell(
+                        Strings.signalsTakeProfit.resolve(),
+                        position.takeProfitPrice?.let { formatPrice(it) } ?: "—",
+                        Modifier.weight(1f),
+                        valueColor = if (position.takeProfitPrice != null) ProfitGreen else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                position.riskUsdt?.let {
-                    Text(
-                        "${Strings.riskUsdAmountLabel.resolve()}: $${"%.2f".format(it)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                position.totalFeeUsdt?.let { fee ->
-                    val phpText = phpRate?.let { rate -> " (≈₱${"%.2f".format(fee * rate)})" } ?: ""
-                    Text(
-                        "${Strings.tradingFeeLabel.resolve()}: $${"%.4f".format(fee)}$phpText",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Spacer(Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                StatCell(
+                    Strings.riskUsdAmountLabel.resolve(),
+                    position.riskUsdt?.let { "$${"%.2f".format(it)}" } ?: "—",
+                    Modifier.weight(1f)
+                )
+                StatCell(
+                    Strings.tradingFeeLabel.resolve(),
+                    position.totalFeeUsdt?.let { fee ->
+                        val phpText = phpRate?.let { rate -> " (≈₱${"%.2f".format(fee * rate)})" } ?: ""
+                        "$${"%.4f".format(fee)}$phpText"
+                    } ?: "—",
+                    Modifier.weight(1f)
+                )
             }
-            OutlinedButton(onClick = { showCloseConfirm = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+
+            Button(
+                onClick = { showCloseConfirm = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp)
+            ) {
                 Text(Strings.closePosition.resolve(), color = LossRed)
             }
         }

@@ -2,7 +2,6 @@ package com.copytrade.app.ui.theme
 
 import android.app.Activity
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -40,7 +39,9 @@ private val LightColors = lightColorScheme(
 
 @Composable
 fun CopyTradeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Always dark, matching the MEXC-style look the trading screens are designed
+    // around — no longer follows the system light/dark setting.
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
