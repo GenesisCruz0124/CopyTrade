@@ -66,19 +66,24 @@ fun CreateBotScreen(onBack: () -> Unit, onCreated: () -> Unit) {
                 SegmentedButton(
                     selected = state.strategyKind == StrategyKind.GRID,
                     onClick = { viewModel.setStrategyKind(StrategyKind.GRID) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2)
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 3)
                 ) { Text(Strings.grid.resolve()) }
                 SegmentedButton(
                     selected = state.strategyKind == StrategyKind.DCA,
                     onClick = { viewModel.setStrategyKind(StrategyKind.DCA) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2)
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 3)
                 ) { Text(Strings.dca.resolve()) }
+                SegmentedButton(
+                    selected = state.strategyKind == StrategyKind.FUTURES_SCALP,
+                    onClick = { viewModel.setStrategyKind(StrategyKind.FUTURES_SCALP) },
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(2, 3)
+                ) { Text(Strings.scalping.resolve()) }
             }
 
-            if (state.strategyKind == StrategyKind.GRID) {
-                GridForm(state.grid, viewModel::updateGrid)
-            } else {
-                DcaForm(state.dca, viewModel::updateDca)
+            when (state.strategyKind) {
+                StrategyKind.GRID -> GridForm(state.grid, viewModel::updateGrid)
+                StrategyKind.DCA -> DcaForm(state.dca, viewModel::updateDca)
+                StrategyKind.FUTURES_SCALP -> ScalpForm(state.scalp, viewModel::updateScalp)
             }
 
             if (state.isLiveMode) {
@@ -206,4 +211,55 @@ private fun DcaForm(form: DcaFormState, update: ((DcaFormState) -> DcaFormState)
         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScalpForm(form: ScalpFormState, update: ((ScalpFormState) -> ScalpFormState) -> Unit) {
+    OutlinedTextField(
+        value = form.symbol,
+        onValueChange = { v -> update { it.copy(symbol = v.uppercase()) } },
+        label = { Text(Strings.symbol.resolve()) },
+        modifier = Modifier.fillMaxWidth()
+    )
+    OutlinedTextField(
+        value = form.leverage,
+        onValueChange = { v -> update { it.copy(leverage = v) } },
+        label = { Text("${Strings.leverage.resolve()} (x)") },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth()
+    )
+    Text(Strings.marginMode.resolve(), style = MaterialTheme.typography.bodyMedium)
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        SegmentedButton(
+            selected = form.marginMode == "isolated",
+            onClick = { update { it.copy(marginMode = "isolated") } },
+            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2)
+        ) { Text(Strings.isolated.resolve()) }
+        SegmentedButton(
+            selected = form.marginMode == "cross",
+            onClick = { update { it.copy(marginMode = "cross") } },
+            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2)
+        ) { Text(Strings.cross.resolve()) }
+    }
+    OutlinedTextField(
+        value = form.riskUsdAmount,
+        onValueChange = { v -> update { it.copy(riskUsdAmount = v) } },
+        label = { Text(Strings.riskUsdAmountLabel.resolve()) },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth()
+    )
+    Text(Strings.interval.resolve(), style = MaterialTheme.typography.bodyMedium)
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        SegmentedButton(
+            selected = form.interval == "Min1",
+            onClick = { update { it.copy(interval = "Min1") } },
+            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2)
+        ) { Text("1m") }
+        SegmentedButton(
+            selected = form.interval == "Min5",
+            onClick = { update { it.copy(interval = "Min5") } },
+            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2)
+        ) { Text("5m") }
+    }
 }

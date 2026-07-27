@@ -190,6 +190,20 @@ data class CreateGridBotRequest(
 )
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
+data class CreateFuturesScalpBotRequest(
+    @EncodeDefault val type: String = "futures_scalp",
+    val symbol: String,
+    val leverage: Int,
+    val marginMode: String,
+    val riskUsdAmount: Double,
+    val interval: String,
+    val confidenceThreshold: Double? = null,
+    val dailyLossLimitUsdt: Double? = null,
+    val confirmLive: Boolean = false
+)
+
+@Serializable
 data class CopySignalDto(
     val id: String,
     val source: String,

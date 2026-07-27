@@ -24,7 +24,7 @@ export function runMigrations(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS bots (
       id TEXT PRIMARY KEY,
       user_id TEXT REFERENCES users(id),
-      type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca')),
+      type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca', 'futures_scalp')),
       symbol TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
       config TEXT NOT NULL,
@@ -195,6 +195,9 @@ export function runMigrations(db: Database.Database): void {
   addColumnIfMissing(db, "copy_signals", "user_id", "TEXT REFERENCES users(id)");
   addColumnIfMissing(db, "futures_positions", "user_id", "TEXT REFERENCES users(id)");
   addColumnIfMissing(db, "futures_pending_orders", "user_id", "TEXT REFERENCES users(id)");
+  // Must run after the user_id backfill above — it copies bots.user_id, which needs
+  // to already exist as a real column on every possible predecessor schema shape.
+  migrateBotsTableForScalp(db);
   // Archiving: hides a signal from the default feed without changing its status
   // (unlike REJECTED, which is terminal) — archived_at is nullable, so existing
   // databases predating this column just backfill everyone as "not archived".
@@ -261,4 +264,50 @@ function migrateBotsTableForFutures(db: Database.Database): void {
     `);
     db.exec(`DROP TABLE bots_old`);
   })();
+}
+
+/**
+ * bots.type may pre-date scalp support (a DB created before this migration).
+ * Same rebuild technique as migrateBotsTableForFutures above — SQLite can't
+ * alter a CHECK constraint in place. Detected via the table's own stored SQL
+ * (no distinguishing column exists to gate on, unlike the futures migration).
+ */
+function migrateBotsTableForScalp(db: Database.Database): void {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bots'`).get() as
+    | { sql: string }
+    | undefined;
+  if (!row || row.sql.includes("futures_scalp")) return;
+
+  db.transaction(() => {
+    db.exec(`ALTER TABLE bots RENAME TO bots_old`);
+    db.exec(`
+      CREATE TABLE bots (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id),
+        type TEXT NOT NULL CHECK (type IN ('grid', 'dca', 'futures_grid', 'futures_dca', 'futures_scalp')),
+        symbol TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'paused', 'stopped')),
+        config TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT '{}',
+        confirm_live INTEGER NOT NULL DEFAULT 0,
+        allocated_usdt REAL NOT NULL DEFAULT 0,
+        daily_loss_limit_usdt REAL,
+        realized_pnl_usdt REAL NOT NULL DEFAULT 0,
+        market TEXT NOT NULL DEFAULT 'spot' CHECK (market IN ('spot', 'futures')),
+        leverage REAL,
+        margin_mode TEXT CHECK (margin_mode IN ('isolated', 'cross')),
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+    db.exec(`
+      INSERT INTO bots (id, user_id, type, symbol, status, config, state, confirm_live, allocated_usdt,
+                         daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at)
+      SELECT id, user_id, type, symbol, status, config, state, confirm_live, allocated_usdt,
+             daily_loss_limit_usdt, realized_pnl_usdt, market, leverage, margin_mode, created_at, updated_at
+      FROM bots_old
+    `);
+    db.exec(`DROP TABLE bots_old`);
+  })();
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_bots_user_id ON bots(user_id)`);
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
+import com.copytrade.app.data.remote.dto.CreateFuturesScalpBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-enum class StrategyKind { GRID, DCA }
+enum class StrategyKind { GRID, DCA, FUTURES_SCALP }
 
 data class GridFormState(
     val symbol: String = "BTCUSDT",
@@ -46,10 +47,25 @@ data class DcaFormState(
     }
 }
 
+data class ScalpFormState(
+    val symbol: String = "BTC_USDT",
+    val leverage: String = "10",
+    val marginMode: String = "isolated",
+    val riskUsdAmount: String = "",
+    val interval: String = "Min1"
+) {
+    fun validate(): Boolean {
+        val leverageValue = leverage.toIntOrNull() ?: return false
+        val risk = riskUsdAmount.toDoubleOrNull() ?: return false
+        return symbol.isNotBlank() && leverageValue in 1..125 && risk > 0
+    }
+}
+
 data class CreateBotUiState(
     val strategyKind: StrategyKind = StrategyKind.GRID,
     val grid: GridFormState = GridFormState(),
     val dca: DcaFormState = DcaFormState(),
+    val scalp: ScalpFormState = ScalpFormState(),
     val confirmLive: Boolean = false,
     val isLiveMode: Boolean = false,
     val isSubmitting: Boolean = false,
@@ -86,6 +102,10 @@ class CreateBotViewModel(private val app: CopyTradeApp) : ViewModel() {
         _uiState.value = _uiState.value.copy(dca = update(_uiState.value.dca), showValidationError = false)
     }
 
+    fun updateScalp(update: (ScalpFormState) -> ScalpFormState) {
+        _uiState.value = _uiState.value.copy(scalp = update(_uiState.value.scalp), showValidationError = false)
+    }
+
     fun setConfirmLive(value: Boolean) {
         _uiState.value = _uiState.value.copy(confirmLive = value)
     }
@@ -95,6 +115,7 @@ class CreateBotViewModel(private val app: CopyTradeApp) : ViewModel() {
         val valid = when (state.strategyKind) {
             StrategyKind.GRID -> state.grid.validate()
             StrategyKind.DCA -> state.dca.validate()
+            StrategyKind.FUTURES_SCALP -> state.scalp.validate()
         }
         if (!valid || (state.isLiveMode && !state.confirmLive)) {
             _uiState.value = state.copy(showValidationError = true)
@@ -127,6 +148,16 @@ class CreateBotViewModel(private val app: CopyTradeApp) : ViewModel() {
                             dipMultiplier = state.dca.dipMultiplier.toDoubleOrNull(),
                             dipThresholdPct = state.dca.dipThresholdPct.toDoubleOrNull(),
                             takeProfitPct = state.dca.takeProfitPct.toDoubleOrNull(),
+                            confirmLive = state.confirmLive
+                        )
+                    )
+                    StrategyKind.FUTURES_SCALP -> repo.createFuturesScalpBot(
+                        CreateFuturesScalpBotRequest(
+                            symbol = state.scalp.symbol,
+                            leverage = state.scalp.leverage.toInt(),
+                            marginMode = state.scalp.marginMode,
+                            riskUsdAmount = state.scalp.riskUsdAmount.toDouble(),
+                            interval = state.scalp.interval,
                             confirmLive = state.confirmLive
                         )
                     )

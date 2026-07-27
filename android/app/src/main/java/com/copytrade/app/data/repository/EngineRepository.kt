@@ -12,6 +12,7 @@ import com.copytrade.app.data.remote.ApiService
 import com.copytrade.app.data.remote.dto.AuthCredentialsRequest
 import com.copytrade.app.data.remote.dto.CopySignalDto
 import com.copytrade.app.data.remote.dto.CreateDcaBotRequest
+import com.copytrade.app.data.remote.dto.CreateFuturesScalpBotRequest
 import com.copytrade.app.data.remote.dto.CreateGridBotRequest
 import com.copytrade.app.data.remote.dto.ExchangeKeysRequest
 import com.copytrade.app.data.remote.dto.FuturesPendingOrderDto
@@ -75,6 +76,11 @@ class EngineRepository(
 
     suspend fun createDcaBot(request: CreateDcaBotRequest) {
         api.createDcaBot(request)
+        refreshBots()
+    }
+
+    suspend fun createFuturesScalpBot(request: CreateFuturesScalpBotRequest) {
+        api.createFuturesScalpBot(request)
         refreshBots()
     }
 

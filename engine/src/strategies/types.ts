@@ -37,3 +37,32 @@ export interface GridLevelState {
   clientOrderId?: string;
   orderId?: string;
 }
+
+/** MEXC's futures kline interval enum (distinct from spot's "15m"/"1h" strings). */
+export type ScalpInterval = "Min1" | "Min5";
+
+export interface ScalpConfig {
+  symbol: string;
+  leverage: number;
+  marginMode: MarginMode;
+  riskUsdAmount: number;
+  interval: ScalpInterval;
+  confidenceThreshold?: number; // 0-100, default 35
+  atrStopMultiplier?: number; // default 1.0
+  atrTakeProfitMultiplier?: number; // default 1.5
+  exitOnSignalReversal?: boolean; // default true
+}
+
+/** Persisted into bots.state under a "position" key so a restart resumes mid-trade correctly. */
+export interface ScalpPositionState {
+  positionType: "long" | "short";
+  entryPrice: number;
+  quantity: number;
+  contractSize: number;
+  stopLossPrice: number;
+  takeProfitPrice: number;
+  leverage: number;
+  marginMode: MarginMode;
+  entryOrderId: string | null;
+  openedAt: number;
+}

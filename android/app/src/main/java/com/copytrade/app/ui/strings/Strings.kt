@@ -83,6 +83,7 @@ object Strings {
     val strategyType = Bi("Strategy", "Estratehiya")
     val grid = Bi("Grid", "Grid")
     val dca = Bi("DCA", "DCA")
+    val scalping = Bi("Scalp", "Scalp")
     val symbol = Bi("Symbol", "Symbol")
     val lowerPrice = Bi("Lower price", "Pinakamababang presyo")
     val upperPrice = Bi("Upper price", "Pinakamataas na presyo")
