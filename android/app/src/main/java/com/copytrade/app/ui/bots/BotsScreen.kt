@@ -96,7 +96,7 @@ private fun BotCard(bot: BotEntity, onClick: () -> Unit) {
 }
 
 @Composable
-private fun statusLabel(status: String): String = when (status) {
+internal fun statusLabel(status: String): String = when (status) {
     "running" -> Strings.statusRunning.resolve()
     "paused" -> Strings.statusPaused.resolve()
     else -> Strings.statusStopped.resolve()
