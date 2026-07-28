@@ -577,8 +577,11 @@ internal fun PositionCard(
                         Strings.signalsTakeProfit.resolve(),
                         position.takeProfitPrice?.let { tp ->
                             val profitText = tpImpliedProfitUsdt?.let { profit ->
+                                // Same ROE% the card's own PnL line and the "Edit TP" dialog use —
+                                // lets the two stay directly comparable at a glance.
+                                val tpPnlPercent = profit / position.marginUsdt * 100
                                 val phpText = phpRate?.let { rate -> " (≈₱${"%.2f".format(profit * rate)})" } ?: ""
-                                "\n+$${"%.2f".format(profit)}$phpText"
+                                "\n+$${"%.2f".format(profit)} (+${"%.2f".format(tpPnlPercent)}%)$phpText"
                             } ?: ""
                             "${formatPrice(tp)}$profitText"
                         } ?: "—",
