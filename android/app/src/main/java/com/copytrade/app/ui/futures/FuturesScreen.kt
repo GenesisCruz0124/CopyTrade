@@ -569,9 +569,19 @@ internal fun PositionCard(
                         Modifier.weight(1f),
                         valueColor = if (position.stopLossPrice != null) LossRed else MaterialTheme.colorScheme.onSurface
                     )
+                    val direction = if (position.side == "long") 1 else -1
+                    val tpImpliedProfitUsdt = position.takeProfitPrice?.let { tp ->
+                        (tp - position.entryPrice) * position.quantity * position.contractSize * direction
+                    }
                     StatCell(
                         Strings.signalsTakeProfit.resolve(),
-                        position.takeProfitPrice?.let { formatPrice(it) } ?: "—",
+                        position.takeProfitPrice?.let { tp ->
+                            val profitText = tpImpliedProfitUsdt?.let { profit ->
+                                val phpText = phpRate?.let { rate -> " (≈₱${"%.2f".format(profit * rate)})" } ?: ""
+                                "\n+$${"%.2f".format(profit)}$phpText"
+                            } ?: ""
+                            "${formatPrice(tp)}$profitText"
+                        } ?: "—",
                         Modifier.weight(1f),
                         valueColor = if (position.takeProfitPrice != null) ProfitGreen else MaterialTheme.colorScheme.onSurface
                     )
