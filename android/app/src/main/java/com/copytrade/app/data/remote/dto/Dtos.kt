@@ -292,6 +292,7 @@ data class FuturesPositionDto(
     @kotlinx.serialization.SerialName("open_type") val openType: String,
     @kotlinx.serialization.SerialName("entry_price") val entryPrice: Double,
     val quantity: Double,
+    @kotlinx.serialization.SerialName("contract_size") val contractSize: Double = 1.0,
     @kotlinx.serialization.SerialName("margin_usdt") val marginUsdt: Double,
     @kotlinx.serialization.SerialName("take_profit_price") val takeProfitPrice: Double? = null,
     @kotlinx.serialization.SerialName("stop_loss_price") val stopLossPrice: Double? = null,
