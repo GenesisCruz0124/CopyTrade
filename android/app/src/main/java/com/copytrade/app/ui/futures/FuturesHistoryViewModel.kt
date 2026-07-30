@@ -81,11 +81,30 @@ class FuturesHistoryViewModel(private val app: CopyTradeApp) : ViewModel() {
 
     /** Sets an already-open position's take-profit target as % PnL on margin (ROE) —
      *  the same number shown on the position card — so it auto-closes once reached. */
-    fun setTakeProfit(id: String, pnlPercent: Double) {
+    fun setTakeProfitByPnlPercent(id: String, pnlPercent: Double) = editPositionField {
+        it.setFuturesTakeProfitByPnlPercent(id, pnlPercent)
+    }
+
+    /** Sets an already-open position's take-profit to a specific price instead of a PnL %. */
+    fun setTakeProfitByPrice(id: String, price: Double) = editPositionField {
+        it.setFuturesTakeProfitByPrice(id, price)
+    }
+
+    /** Sets an already-open position's stop-loss as "I'm willing to lose $X". */
+    fun setStopLossByRiskUsd(id: String, riskUsd: Double) = editPositionField {
+        it.setFuturesStopLossByRiskUsd(id, riskUsd)
+    }
+
+    /** Sets an already-open position's stop-loss to a specific price instead of a risk amount. */
+    fun setStopLossByPrice(id: String, price: Double) = editPositionField {
+        it.setFuturesStopLossByPrice(id, price)
+    }
+
+    private fun editPositionField(action: suspend (com.copytrade.app.data.repository.EngineRepository) -> Unit) {
         viewModelScope.launch {
             try {
                 val url = app.settingsRepository.serverUrl.first() ?: return@launch
-                app.repositoryFor(url).setFuturesTakeProfit(id, pnlPercent)
+                action(app.repositoryFor(url))
                 refresh()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.toUserMessage())

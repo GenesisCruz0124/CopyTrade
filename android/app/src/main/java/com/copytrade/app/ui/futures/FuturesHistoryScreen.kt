@@ -93,7 +93,10 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                             PositionCard(
                                 position = position,
                                 onClose = { viewModel.closePosition(position.id) },
-                                onSetTakeProfit = { pct -> viewModel.setTakeProfit(position.id, pct) },
+                                onSetTakeProfitByPnlPercent = { pct -> viewModel.setTakeProfitByPnlPercent(position.id, pct) },
+                                onSetTakeProfitByPrice = { price -> viewModel.setTakeProfitByPrice(position.id, price) },
+                                onSetStopLossByRiskUsd = { risk -> viewModel.setStopLossByRiskUsd(position.id, risk) },
+                                onSetStopLossByPrice = { price -> viewModel.setStopLossByPrice(position.id, price) },
                                 phpRate = state.usdToPhpRate
                             )
                         }

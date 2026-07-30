@@ -544,21 +544,59 @@ export function buildServer(deps: ApiServerDeps): FastifyInstance {
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { pnlPercent?: number } }>("/futures/positions/:id/take-profit", async (req, reply) => {
-    const runtime = getFuturesRuntimeOrReply(deps, req, reply);
-    if (!runtime) return;
-    const pnlPercent = req.body?.pnlPercent;
-    if (typeof pnlPercent !== "number" || !Number.isFinite(pnlPercent) || pnlPercent <= 0) {
-      reply.code(400).send({ mode: runtime.mode, error: "pnlPercent must be a positive number" });
-      return;
+  app.post<{ Params: { id: string }; Body: { pnlPercent?: number; price?: number } }>(
+    "/futures/positions/:id/take-profit",
+    async (req, reply) => {
+      const runtime = getFuturesRuntimeOrReply(deps, req, reply);
+      if (!runtime) return;
+      const { pnlPercent, price } = req.body ?? {};
+      if (typeof price === "number") {
+        if (!Number.isFinite(price) || price <= 0) {
+          reply.code(400).send({ mode: runtime.mode, error: "price must be a positive number" });
+          return;
+        }
+      } else if (typeof pnlPercent !== "number" || !Number.isFinite(pnlPercent) || pnlPercent <= 0) {
+        reply.code(400).send({ mode: runtime.mode, error: "pnlPercent or price must be a positive number" });
+        return;
+      }
+      try {
+        const position =
+          typeof price === "number"
+            ? await runtime.positions.setTakeProfitByPrice(req.params.id, price)
+            : await runtime.positions.setTakeProfitByPnlPercent(req.params.id, pnlPercent!);
+        reply.send({ mode: runtime.mode, position });
+      } catch (err) {
+        reply.code(400).send({ mode: runtime.mode, error: String(err instanceof Error ? err.message : err) });
+      }
     }
-    try {
-      const position = await runtime.positions.setTakeProfitByPnlPercent(req.params.id, pnlPercent);
-      reply.send({ mode: runtime.mode, position });
-    } catch (err) {
-      reply.code(400).send({ mode: runtime.mode, error: String(err instanceof Error ? err.message : err) });
+  );
+
+  app.post<{ Params: { id: string }; Body: { riskUsd?: number; price?: number } }>(
+    "/futures/positions/:id/stop-loss",
+    async (req, reply) => {
+      const runtime = getFuturesRuntimeOrReply(deps, req, reply);
+      if (!runtime) return;
+      const { riskUsd, price } = req.body ?? {};
+      if (typeof price === "number") {
+        if (!Number.isFinite(price) || price <= 0) {
+          reply.code(400).send({ mode: runtime.mode, error: "price must be a positive number" });
+          return;
+        }
+      } else if (typeof riskUsd !== "number" || !Number.isFinite(riskUsd) || riskUsd <= 0) {
+        reply.code(400).send({ mode: runtime.mode, error: "riskUsd or price must be a positive number" });
+        return;
+      }
+      try {
+        const position =
+          typeof price === "number"
+            ? await runtime.positions.setStopLossByPrice(req.params.id, price)
+            : await runtime.positions.setStopLossByRiskUsd(req.params.id, riskUsd!);
+        reply.send({ mode: runtime.mode, position });
+      } catch (err) {
+        reply.code(400).send({ mode: runtime.mode, error: String(err instanceof Error ? err.message : err) });
+      }
     }
-  });
+  );
 
   app.post<{ Params: { id: string } }>("/futures/positions/:id/close", async (req, reply) => {
     const runtime = getFuturesRuntimeOrReply(deps, req, reply);

@@ -199,7 +199,10 @@ fun DashboardScreen(
                                 PositionCard(
                                     position = position,
                                     onClose = { futuresViewModel.closePosition(position.id) },
-                                    onSetTakeProfit = { pct -> futuresViewModel.setTakeProfit(position.id, pct) },
+                                    onSetTakeProfitByPnlPercent = { pct -> futuresViewModel.setTakeProfitByPnlPercent(position.id, pct) },
+                                    onSetTakeProfitByPrice = { price -> futuresViewModel.setTakeProfitByPrice(position.id, price) },
+                                    onSetStopLossByRiskUsd = { risk -> futuresViewModel.setStopLossByRiskUsd(position.id, risk) },
+                                    onSetStopLossByPrice = { price -> futuresViewModel.setStopLossByPrice(position.id, price) },
                                     phpRate = state.usdToPhpRate
                                 )
                             }
