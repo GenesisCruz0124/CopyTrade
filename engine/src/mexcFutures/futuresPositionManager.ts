@@ -236,21 +236,78 @@ export class FuturesPositionManager {
    */
   async setTakeProfitByPnlPercent(positionId: string, pnlPercent: number): Promise<FuturesPositionRow> {
     if (pnlPercent <= 0) throw new Error("take-profit PnL percent must be greater than 0");
-    const row = this.db.prepare(`SELECT * FROM futures_positions WHERE id = ? AND user_id IS ?`).get(positionId, this.userId) as
-      | FuturesPositionRow
-      | undefined;
-    if (!row) throw new Error(`position ${positionId} not found`);
-    if (row.status === "closed") throw new Error(`position ${positionId} is already closed`);
+    const row = this.requireOpenRow(positionId);
 
     const priceMovePercent = pnlPercent / row.leverage;
     const takeProfitPrice =
       row.side === "long" ? row.entry_price * (1 + priceMovePercent / 100) : row.entry_price * (1 - priceMovePercent / 100);
     if (takeProfitPrice <= 0) throw new Error("take-profit percent is too large — would result in a non-positive price");
 
-    const now = Date.now();
-    this.db.prepare(`UPDATE futures_positions SET take_profit_price = ?, updated_at = ? WHERE id = ?`).run(takeProfitPrice, now, positionId);
+    return this.updateTakeProfitPrice(row, takeProfitPrice);
+  }
 
+  /** Sets an open position's take-profit as an absolute price instead of a PnL % target —
+   *  the same field, just a different way of expressing where it should sit. */
+  async setTakeProfitByPrice(positionId: string, price: number): Promise<FuturesPositionRow> {
+    if (price <= 0) throw new Error("take-profit price must be greater than 0");
+    const row = this.requireOpenRow(positionId);
+    return this.updateTakeProfitPrice(row, price);
+  }
+
+  /** Sets an open position's stop-loss as "I'm willing to lose $X" — the same input the
+   *  Futures form's risk-amount field uses at open time — converted through the same
+   *  leverage relationship as setTakeProfitByPnlPercent. */
+  async setStopLossByRiskUsd(positionId: string, riskUsd: number): Promise<FuturesPositionRow> {
+    if (riskUsd <= 0) throw new Error("risk amount must be greater than 0");
+    const row = this.requireOpenRow(positionId);
+
+    const priceMovePercent = (riskUsd / (row.margin_usdt * row.leverage)) * 100;
+    if (priceMovePercent >= 100) {
+      throw new Error("risk amount implies a stop-loss move of 100% or more of the entry price — reduce it");
+    }
+    const stopLossPrice =
+      row.side === "long" ? row.entry_price * (1 - priceMovePercent / 100) : row.entry_price * (1 + priceMovePercent / 100);
+    if (stopLossPrice <= 0) throw new Error("risk amount is too large — would result in a non-positive stop-loss price");
+
+    return this.updateStopLossPrice(row, stopLossPrice, riskUsd);
+  }
+
+  /** Sets an open position's stop-loss as an absolute price. risk_usdt is recomputed from
+   *  the implied move so it stays consistent with whatever price was actually set. */
+  async setStopLossByPrice(positionId: string, price: number): Promise<FuturesPositionRow> {
+    if (price <= 0) throw new Error("stop-loss price must be greater than 0");
+    const row = this.requireOpenRow(positionId);
+
+    const direction = row.side === "long" ? 1 : -1;
+    const priceMovePercent = ((row.entry_price - price) / row.entry_price) * 100 * direction;
+    const riskUsd = priceMovePercent > 0 ? row.margin_usdt * row.leverage * (priceMovePercent / 100) : null;
+
+    return this.updateStopLossPrice(row, price, riskUsd);
+  }
+
+  private requireOpenRow(positionId: string): FuturesPositionRow {
+    const row = this.db.prepare(`SELECT * FROM futures_positions WHERE id = ? AND user_id IS ?`).get(positionId, this.userId) as
+      | FuturesPositionRow
+      | undefined;
+    if (!row) throw new Error(`position ${positionId} not found`);
+    if (row.status === "closed") throw new Error(`position ${positionId} is already closed`);
+    return row;
+  }
+
+  private updateTakeProfitPrice(row: FuturesPositionRow, takeProfitPrice: number): FuturesPositionRow {
+    const now = Date.now();
+    this.db
+      .prepare(`UPDATE futures_positions SET take_profit_price = ?, updated_at = ? WHERE id = ?`)
+      .run(takeProfitPrice, now, row.id);
     return { ...row, take_profit_price: takeProfitPrice, updated_at: now };
+  }
+
+  private updateStopLossPrice(row: FuturesPositionRow, stopLossPrice: number, riskUsd: number | null): FuturesPositionRow {
+    const now = Date.now();
+    this.db
+      .prepare(`UPDATE futures_positions SET stop_loss_price = ?, risk_usdt = ?, updated_at = ? WHERE id = ?`)
+      .run(stopLossPrice, riskUsd, now, row.id);
+    return { ...row, stop_loss_price: stopLossPrice, risk_usdt: riskUsd, updated_at: now };
   }
 
   async listOpen(): Promise<FuturesPositionView[]> {

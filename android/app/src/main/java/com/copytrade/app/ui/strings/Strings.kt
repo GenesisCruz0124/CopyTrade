@@ -230,12 +230,20 @@ object Strings {
     )
     val editTakeProfit = Bi("Edit TP", "I-edit ang TP")
     val setTakeProfit = Bi("Set TP", "Itakda ang TP")
-    val takeProfitDialogTitle = Bi("Take-profit at PnL %", "Take-profit sa PnL %")
+    val takeProfitDialogTitle = Bi("Set take-profit", "Itakda ang take-profit")
     val takeProfitDialogMessage = Bi(
-        "Closes this position once its PnL reaches this percent — the same % shown above.",
-        "Isasara ang position na ito kapag umabot ang PnL nito sa porsyentong ito — ang parehong % na nakikita sa itaas."
+        "Closes this position once its PnL (or price) reaches this target.",
+        "Isasara ang position na ito kapag umabot ang PnL (o presyo) nito sa target na ito."
     )
     val takeProfitPnlPercentLabel = Bi("PnL % target", "Target na PnL %")
+    val editStopLoss = Bi("Edit SL", "I-edit ang SL")
+    val setStopLoss = Bi("Set SL", "Itakda ang SL")
+    val stopLossDialogTitle = Bi("Set stop-loss", "Itakda ang stop-loss")
+    val stopLossDialogMessage = Bi(
+        "Closes this position once its price hits this stop-loss.",
+        "Isasara ang position na ito kapag umabot ang presyo nito sa stop-loss na ito."
+    )
+    val stopLossByRiskAmount = Bi("Risk amount", "Halaga ng risk")
     val openPositions = Bi("Open positions", "Mga bukas na position")
     val noOpenPositions = Bi("No open positions", "Walang bukas na position")
     val entryPrice = Bi("Entry", "Entry")

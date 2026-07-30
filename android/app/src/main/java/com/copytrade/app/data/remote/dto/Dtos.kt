@@ -357,7 +357,14 @@ data class FuturesPositionResponseDto(
 
 @Serializable
 data class SetTakeProfitRequest(
-    val pnlPercent: Double
+    val pnlPercent: Double? = null,
+    val price: Double? = null
+)
+
+@Serializable
+data class SetStopLossRequest(
+    val riskUsd: Double? = null,
+    val price: Double? = null
 )
 
 @Serializable

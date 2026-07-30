@@ -21,6 +21,7 @@ import com.copytrade.app.data.remote.dto.FuturesSymbolDto
 import com.copytrade.app.data.remote.dto.FuturesTodayPnlDto
 import com.copytrade.app.data.remote.dto.KlineDto
 import com.copytrade.app.data.remote.dto.OpenFuturesPositionRequest
+import com.copytrade.app.data.remote.dto.SetStopLossRequest
 import com.copytrade.app.data.remote.dto.SetTakeProfitRequest
 import com.copytrade.app.data.remote.dto.SignalDto
 import com.copytrade.app.data.remote.dto.SpotSymbolDto
@@ -156,8 +157,17 @@ class EngineRepository(
 
     suspend fun closeFuturesPosition(id: String): FuturesPositionDto? = api.closeFuturesPosition(id).position
 
-    suspend fun setFuturesTakeProfit(id: String, pnlPercent: Double): FuturesPositionDto? =
-        api.setFuturesTakeProfit(id, SetTakeProfitRequest(pnlPercent)).position
+    suspend fun setFuturesTakeProfitByPnlPercent(id: String, pnlPercent: Double): FuturesPositionDto? =
+        api.setFuturesTakeProfit(id, SetTakeProfitRequest(pnlPercent = pnlPercent)).position
+
+    suspend fun setFuturesTakeProfitByPrice(id: String, price: Double): FuturesPositionDto? =
+        api.setFuturesTakeProfit(id, SetTakeProfitRequest(price = price)).position
+
+    suspend fun setFuturesStopLossByRiskUsd(id: String, riskUsd: Double): FuturesPositionDto? =
+        api.setFuturesStopLoss(id, SetStopLossRequest(riskUsd = riskUsd)).position
+
+    suspend fun setFuturesStopLossByPrice(id: String, price: Double): FuturesPositionDto? =
+        api.setFuturesStopLoss(id, SetStopLossRequest(price = price)).position
 
     suspend fun getFuturesPositionsHistory(): List<FuturesPositionDto> = api.getFuturesPositionsHistory().positions
 
