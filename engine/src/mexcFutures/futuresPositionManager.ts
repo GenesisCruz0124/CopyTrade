@@ -47,6 +47,14 @@ function totalFee(row: FuturesPositionRow): number | null {
   return row.open_fee_usdt + (row.close_fee_usdt ?? 0);
 }
 
+/** MEXC futures API error code 2009 — the position we're trying to place a closing
+ *  order against doesn't exist on the exchange anymore (already liquidated, or closed
+ *  directly on MEXC's own app/site). Matched on the stable numeric code, not the
+ *  human-readable message, which MEXC could reword or localize. */
+function isPositionAlreadyClosedError(err: unknown): boolean {
+  return err instanceof Error && /\bcode=2009\b/.test(err.message);
+}
+
 export interface FuturesPositionView extends FuturesPositionRow {
   currentPrice: number | null;
   unrealizedPnlUsdt: number | null;
@@ -189,21 +197,35 @@ export class FuturesPositionManager {
 
     const ticker = await this.futuresClient.ticker(row.symbol);
     const closeSide = row.side === "long" ? 4 : 2; // 4=close long, 2=close short
-    await this.futuresClient.placeOrder({
-      symbol: row.symbol,
-      side: closeSide,
-      vol: row.quantity,
-      leverage: row.leverage,
-      openType: row.open_type,
-      type: "MARKET",
-      externalOid: `man-close-${randomUUID().slice(0, 10)}`
-    });
+    let closedExternally = false;
+    try {
+      await this.futuresClient.placeOrder({
+        symbol: row.symbol,
+        side: closeSide,
+        vol: row.quantity,
+        leverage: row.leverage,
+        openType: row.open_type,
+        type: "MARKET",
+        externalOid: `man-close-${randomUUID().slice(0, 10)}`
+      });
+    } catch (err) {
+      // MEXC already closed this position out-of-band — liquidation, or closed directly
+      // on MEXC's own app/site, bypassing this app entirely — so our closing order has
+      // nothing left to close. Reconcile the local row instead of leaving it stuck "open"
+      // forever and re-throwing the same error on every retry (monitor() and the user
+      // both hitting a wall on a position that, on the exchange, no longer exists).
+      if (!isPositionAlreadyClosedError(err)) throw err;
+      closedExternally = true;
+    }
 
     const closePrice = ticker.fairPrice;
     const direction = row.side === "long" ? 1 : -1;
     const realizedPnlUsdt = (closePrice - row.entry_price) * row.quantity * row.contract_size * direction;
     const takerFeeRate = row.taker_fee_rate ?? 0.0006;
-    const closeFeeUsdt = row.quantity * closePrice * row.contract_size * takerFeeRate;
+    // We never placed an order (and MEXC's actual close/liquidation fee is unknown to
+    // us), so a fee figure here would be a guess dressed up as data — leave it null.
+    const closeFeeUsdt = closedExternally ? null : row.quantity * closePrice * row.contract_size * takerFeeRate;
+    const closeReason = closedExternally ? "already_closed" : reason;
     const now = Date.now();
 
     this.db
@@ -212,13 +234,13 @@ export class FuturesPositionManager {
          SET status = 'closed', close_price = ?, close_reason = ?, realized_pnl_usdt = ?, close_fee_usdt = ?, updated_at = ?, closed_at = ?
          WHERE id = ?`
       )
-      .run(closePrice, reason, realizedPnlUsdt, closeFeeUsdt, now, now, positionId);
+      .run(closePrice, closeReason, realizedPnlUsdt, closeFeeUsdt, now, now, positionId);
 
     return {
       ...row,
       status: "closed",
       close_price: closePrice,
-      close_reason: reason,
+      close_reason: closeReason,
       realized_pnl_usdt: realizedPnlUsdt,
       close_fee_usdt: closeFeeUsdt,
       closed_at: now
