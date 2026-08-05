@@ -1,7 +1,6 @@
 package com.copytrade.app.ui.futures
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CandlestickChart
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -511,12 +513,7 @@ internal fun PositionCard(
     }
     val sideColor = if (position.side == "long") ProfitGreen else LossRed
 
-    val cardModifier = if (onOpenChart != null) {
-        Modifier.fillMaxWidth().clickable(onClick = onOpenChart)
-    } else {
-        Modifier.fillMaxWidth()
-    }
-    Card(modifier = cardModifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(position.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -629,7 +626,21 @@ internal fun PositionCard(
                 )
             }
 
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            onOpenChart?.let { openChart ->
+                OutlinedButton(
+                    onClick = openChart,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp)
+                ) {
+                    Icon(Icons.Filled.CandlestickChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(Strings.viewChart.resolve())
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = if (onOpenChart != null) 8.dp else 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedButton(
                     onClick = { showModifyDialog = true },
                     shape = RoundedCornerShape(50),
