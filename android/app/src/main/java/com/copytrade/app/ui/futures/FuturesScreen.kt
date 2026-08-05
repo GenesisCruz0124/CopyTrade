@@ -490,8 +490,7 @@ internal fun PositionCard(
     phpRate: Double? = null
 ) {
     var showCloseConfirm by remember { mutableStateOf(false) }
-    var showTpDialog by remember { mutableStateOf(false) }
-    var showSlDialog by remember { mutableStateOf(false) }
+    var showModifyDialog by remember { mutableStateOf(false) }
     val pnlUsdt = position.unrealizedPnlUsdt
     val pnlPercent = position.unrealizedPnlPercent
     val pnlColor = when {
@@ -617,145 +616,119 @@ internal fun PositionCard(
 
             Row(modifier = Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { showSlDialog = true },
+                    onClick = { showModifyDialog = true },
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        if (position.stopLossPrice != null) Strings.editStopLoss.resolve() else Strings.setStopLoss.resolve(),
-                        color = LossRed
-                    )
+                    Text(Strings.modifyPosition.resolve())
                 }
-                OutlinedButton(
-                    onClick = { showTpDialog = true },
+                Button(
+                    onClick = { showCloseConfirm = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        if (position.takeProfitPrice != null) Strings.editTakeProfit.resolve() else Strings.setTakeProfit.resolve(),
-                        color = ProfitGreen
-                    )
+                    Text(Strings.closePosition.resolve(), color = LossRed)
                 }
-            }
-            Button(
-                onClick = { showCloseConfirm = true },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-            ) {
-                Text(Strings.closePosition.resolve(), color = LossRed)
             }
         }
     }
 
-    if (showTpDialog) {
-        var byPrice by remember { mutableStateOf(false) }
-        var tpInput by remember { mutableStateOf("10") }
-        var tpError by remember { mutableStateOf<String?>(null) }
-        AlertDialog(
-            onDismissRequest = { showTpDialog = false },
-            title = { Text(Strings.takeProfitDialogTitle.resolve()) },
-            text = {
-                Column {
-                    Text(
-                        Strings.takeProfitDialogMessage.resolve(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = !byPrice,
-                            onClick = { byPrice = false; tpInput = "10"; tpError = null },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2)
-                        ) { Text(Strings.takeProfitByPercent.resolve()) }
-                        SegmentedButton(
-                            selected = byPrice,
-                            onClick = { byPrice = true; tpInput = position.takeProfitPrice?.let { formatPrice(it) } ?: ""; tpError = null },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2)
-                        ) { Text(Strings.takeProfitByPrice.resolve()) }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = tpInput,
-                        onValueChange = { tpInput = it; tpError = null },
-                        label = { Text(if (byPrice) Strings.takeProfitPriceLabel.resolve() else Strings.takeProfitPnlPercentLabel.resolve()) },
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        isError = tpError != null,
-                        supportingText = tpError?.let { { Text(it, color = LossRed) } },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val value = tpInput.toDoubleOrNull()
-                    if (value == null || value <= 0) {
-                        tpError = "Enter a number greater than 0"
-                    } else {
-                        if (byPrice) onSetTakeProfitByPrice(value) else onSetTakeProfitByPnlPercent(value)
-                        showTpDialog = false
-                    }
-                }) { Text(Strings.confirm.resolve()) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTpDialog = false }) { Text(Strings.cancel.resolve()) }
-            }
-        )
-    }
-
-    if (showSlDialog) {
-        var byPrice by remember { mutableStateOf(false) }
-        var slInput by remember { mutableStateOf("1") }
+    if (showModifyDialog) {
+        // MT5-style: SL and TP together in one dialog, one Modify button — instead of
+        // two separate edit flows. Either field can be left blank to leave that side
+        // untouched; each still keeps its own price/percent-or-risk input mode.
+        var slByPrice by remember { mutableStateOf(true) }
+        var slInput by remember { mutableStateOf(position.stopLossPrice?.let { formatPrice(it) } ?: "") }
         var slError by remember { mutableStateOf<String?>(null) }
+        var tpByPrice by remember { mutableStateOf(true) }
+        var tpInput by remember { mutableStateOf(position.takeProfitPrice?.let { formatPrice(it) } ?: "") }
+        var tpError by remember { mutableStateOf<String?>(null) }
+        var generalError by remember { mutableStateOf<String?>(null) }
+
         AlertDialog(
-            onDismissRequest = { showSlDialog = false },
-            title = { Text(Strings.stopLossDialogTitle.resolve()) },
+            onDismissRequest = { showModifyDialog = false },
+            title = { Text(Strings.modifyPositionDialogTitle.resolve()) },
             text = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        Strings.stopLossDialogMessage.resolve(),
+                        Strings.modifyPositionDialogMessage.resolve(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(4.dp))
+
+                    Text(Strings.signalsStopLoss.resolve(), style = MaterialTheme.typography.labelLarge, color = LossRed)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(
-                            selected = !byPrice,
-                            onClick = { byPrice = false; slInput = "1"; slError = null },
+                            selected = slByPrice,
+                            onClick = { slByPrice = true; slInput = position.stopLossPrice?.let { formatPrice(it) } ?: ""; slError = null },
                             shape = SegmentedButtonDefaults.itemShape(0, 2)
-                        ) { Text(Strings.stopLossByRiskAmount.resolve()) }
-                        SegmentedButton(
-                            selected = byPrice,
-                            onClick = { byPrice = true; slInput = position.stopLossPrice?.let { formatPrice(it) } ?: ""; slError = null },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2)
                         ) { Text(Strings.stopLossByPrice.resolve()) }
+                        SegmentedButton(
+                            selected = !slByPrice,
+                            onClick = { slByPrice = false; slInput = ""; slError = null },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) { Text(Strings.stopLossByRiskAmount.resolve()) }
                     }
-                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = slInput,
                         onValueChange = { slInput = it; slError = null },
-                        label = { Text(if (byPrice) Strings.stopLossPriceLabel.resolve() else Strings.riskUsdAmountLabel.resolve()) },
+                        label = { Text(if (slByPrice) Strings.stopLossPriceLabel.resolve() else Strings.riskUsdAmountLabel.resolve()) },
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         isError = slError != null,
                         supportingText = slError?.let { { Text(it, color = LossRed) } },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Spacer(Modifier.height(8.dp))
+                    Text(Strings.signalsTakeProfit.resolve(), style = MaterialTheme.typography.labelLarge, color = ProfitGreen)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = tpByPrice,
+                            onClick = { tpByPrice = true; tpInput = position.takeProfitPrice?.let { formatPrice(it) } ?: ""; tpError = null },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) { Text(Strings.takeProfitByPrice.resolve()) }
+                        SegmentedButton(
+                            selected = !tpByPrice,
+                            onClick = { tpByPrice = false; tpInput = ""; tpError = null },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) { Text(Strings.takeProfitByPercent.resolve()) }
+                    }
+                    OutlinedTextField(
+                        value = tpInput,
+                        onValueChange = { tpInput = it; tpError = null },
+                        label = { Text(if (tpByPrice) Strings.takeProfitPriceLabel.resolve() else Strings.takeProfitPnlPercentLabel.resolve()) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        isError = tpError != null,
+                        supportingText = tpError?.let { { Text(it, color = LossRed) } },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    generalError?.let { Text(it, color = LossRed, style = MaterialTheme.typography.bodySmall) }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val value = slInput.toDoubleOrNull()
-                    if (value == null || value <= 0) {
-                        slError = "Enter a number greater than 0"
-                    } else {
-                        if (byPrice) onSetStopLossByPrice(value) else onSetStopLossByRiskUsd(value)
-                        showSlDialog = false
+                    val slValue = slInput.toDoubleOrNull()
+                    val tpValue = tpInput.toDoubleOrNull()
+                    slError = if (slInput.isNotBlank() && (slValue == null || slValue <= 0)) "Enter a number greater than 0" else null
+                    tpError = if (tpInput.isNotBlank() && (tpValue == null || tpValue <= 0)) "Enter a number greater than 0" else null
+                    generalError = if (slInput.isBlank() && tpInput.isBlank()) "Set at least one of SL or TP" else null
+
+                    if (slError == null && tpError == null && generalError == null) {
+                        if (slValue != null) {
+                            if (slByPrice) onSetStopLossByPrice(slValue) else onSetStopLossByRiskUsd(slValue)
+                        }
+                        if (tpValue != null) {
+                            if (tpByPrice) onSetTakeProfitByPrice(tpValue) else onSetTakeProfitByPnlPercent(tpValue)
+                        }
+                        showModifyDialog = false
                     }
-                }) { Text(Strings.confirm.resolve()) }
+                }) { Text(Strings.modifyPosition.resolve()) }
             },
             dismissButton = {
-                TextButton(onClick = { showSlDialog = false }) { Text(Strings.cancel.resolve()) }
+                TextButton(onClick = { showModifyDialog = false }) { Text(Strings.cancel.resolve()) }
             }
         )
     }

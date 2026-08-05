@@ -228,21 +228,13 @@ object Strings {
         "This closes the position at the current market price. This can't be undone.",
         "Isasara nito ang position sa kasalukuyang presyo ng market. Hindi na ito mababawi."
     )
-    val editTakeProfit = Bi("Edit TP", "I-edit ang TP")
-    val setTakeProfit = Bi("Set TP", "Itakda ang TP")
-    val takeProfitDialogTitle = Bi("Set take-profit", "Itakda ang take-profit")
-    val takeProfitDialogMessage = Bi(
-        "Closes this position once its PnL (or price) reaches this target.",
-        "Isasara ang position na ito kapag umabot ang PnL (o presyo) nito sa target na ito."
+    val modifyPosition = Bi("Modify", "Baguhin")
+    val modifyPositionDialogTitle = Bi("Modify Position", "Baguhin ang Position")
+    val modifyPositionDialogMessage = Bi(
+        "Set a new stop-loss and/or take-profit for this position — leave either blank to leave it unchanged.",
+        "Magtakda ng bagong stop-loss at/o take-profit para sa position na ito — iwanang blangko ang alinman para hindi ito mabago."
     )
     val takeProfitPnlPercentLabel = Bi("PnL % target", "Target na PnL %")
-    val editStopLoss = Bi("Edit SL", "I-edit ang SL")
-    val setStopLoss = Bi("Set SL", "Itakda ang SL")
-    val stopLossDialogTitle = Bi("Set stop-loss", "Itakda ang stop-loss")
-    val stopLossDialogMessage = Bi(
-        "Closes this position once its price hits this stop-loss.",
-        "Isasara ang position na ito kapag umabot ang presyo nito sa stop-loss na ito."
-    )
     val stopLossByRiskAmount = Bi("Risk amount", "Halaga ng risk")
     val openPositions = Bi("Open positions", "Mga bukas na position")
     val noOpenPositions = Bi("No open positions", "Walang bukas na position")
