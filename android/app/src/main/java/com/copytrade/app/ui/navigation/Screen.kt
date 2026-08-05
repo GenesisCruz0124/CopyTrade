@@ -16,4 +16,7 @@ sealed class Screen(val route: String) {
     data object BotDetail : Screen("bot_detail/{botId}") {
         fun route(botId: String) = "bot_detail/$botId"
     }
+    data object TradeChart : Screen("trade_chart/{kind}/{tradeId}") {
+        fun route(kind: String, tradeId: String) = "trade_chart/$kind/$tradeId"
+    }
 }

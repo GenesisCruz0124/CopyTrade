@@ -80,7 +80,9 @@ fun DashboardScreen(
     onOpenSignals: () -> Unit,
     onOpenActivity: () -> Unit,
     onOpenFutures: () -> Unit,
-    onOpenBots: () -> Unit
+    onOpenBots: () -> Unit,
+    onOpenPosition: (String) -> Unit = {},
+    onOpenPendingOrder: (String) -> Unit = {}
 ) {
     val viewModel = appViewModel { DashboardViewModel(it) }
     val state by viewModel.uiState.collectAsState()
@@ -203,7 +205,8 @@ fun DashboardScreen(
                                     onSetTakeProfitByPrice = { price -> futuresViewModel.setTakeProfitByPrice(position.id, price) },
                                     onSetStopLossByRiskUsd = { risk -> futuresViewModel.setStopLossByRiskUsd(position.id, risk) },
                                     onSetStopLossByPrice = { price -> futuresViewModel.setStopLossByPrice(position.id, price) },
-                                    phpRate = state.usdToPhpRate
+                                    phpRate = state.usdToPhpRate,
+                                    onOpenChart = { onOpenPosition(position.id) }
                                 )
                             }
                         }
@@ -217,7 +220,11 @@ fun DashboardScreen(
                     } else {
                         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(futuresState.pendingOrders, key = { it.id }) { order ->
-                                PendingOrderCard(order = order, onCancel = { futuresViewModel.cancelOrder(order.id) })
+                                PendingOrderCard(
+                                    order = order,
+                                    onCancel = { futuresViewModel.cancelOrder(order.id) },
+                                    onOpenChart = { onOpenPendingOrder(order.id) }
+                                )
                             }
                         }
                     }

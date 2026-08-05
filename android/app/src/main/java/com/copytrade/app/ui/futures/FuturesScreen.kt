@@ -1,6 +1,7 @@
 package com.copytrade.app.ui.futures
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,7 +83,12 @@ internal fun formatPrice(price: Double): String = String.format(Locale.US, "%.8f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
+fun FuturesScreen(
+    onBack: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenPosition: (String) -> Unit = {},
+    onOpenPendingOrder: (String) -> Unit = {}
+) {
     val viewModel = appViewModel { FuturesViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -160,7 +166,8 @@ fun FuturesScreen(onBack: () -> Unit, onOpenHistory: () -> Unit) {
                             onSetTakeProfitByPrice = { price -> viewModel.setTakeProfitByPrice(position.id, price) },
                             onSetStopLossByRiskUsd = { risk -> viewModel.setStopLossByRiskUsd(position.id, risk) },
                             onSetStopLossByPrice = { price -> viewModel.setStopLossByPrice(position.id, price) },
-                            phpRate = state.usdToPhpRate
+                            phpRate = state.usdToPhpRate,
+                            onOpenChart = { onOpenPosition(position.id) }
                         )
                     }
                 }
@@ -487,7 +494,10 @@ internal fun PositionCard(
     onSetTakeProfitByPrice: (Double) -> Unit = {},
     onSetStopLossByRiskUsd: (Double) -> Unit = {},
     onSetStopLossByPrice: (Double) -> Unit = {},
-    phpRate: Double? = null
+    phpRate: Double? = null,
+    /** Set on list call-sites to open the live chart; left null when this card is
+     *  already embedded inside that chart screen, so it isn't clickable there. */
+    onOpenChart: (() -> Unit)? = null
 ) {
     var showCloseConfirm by remember { mutableStateOf(false) }
     var showModifyDialog by remember { mutableStateOf(false) }
@@ -501,7 +511,12 @@ internal fun PositionCard(
     }
     val sideColor = if (position.side == "long") ProfitGreen else LossRed
 
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    val cardModifier = if (onOpenChart != null) {
+        Modifier.fillMaxWidth().clickable(onClick = onOpenChart)
+    } else {
+        Modifier.fillMaxWidth()
+    }
+    Card(modifier = cardModifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(position.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

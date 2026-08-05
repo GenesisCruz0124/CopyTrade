@@ -206,6 +206,10 @@ object Strings {
         "Futures trading is not configured on this engine.",
         "Hindi pa naka-configure ang futures trading sa engine na ito."
     )
+    val tradeNoLongerOpen = Bi(
+        "This trade is no longer open — it may have closed, filled, or been cancelled.",
+        "Hindi na bukas ang trade na ito — maaaring nasara, na-fill, o na-cancel na ito."
+    )
     val tokenPair = Bi("Token pair", "Token pair")
     val searchTokenPair = Bi("Search token pair (e.g. BTC_USDT)", "Maghanap ng token pair (e.g. BTC_USDT)")
     val openLong = Bi("Open long", "Open long")
