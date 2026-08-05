@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.copytrade.app.CopyTradeApp
 import com.copytrade.app.ui.components.CandlestickChart
 import com.copytrade.app.ui.components.ChartPriceLine
+import com.copytrade.app.ui.components.DraggableTradeChart
 import com.copytrade.app.ui.components.PollWhileForeground
 import com.copytrade.app.ui.strings.Strings
 import com.copytrade.app.ui.strings.resolve
@@ -90,12 +91,19 @@ fun TradeChartScreen(tradeId: String, kind: TradeChartKind, onBack: () -> Unit) 
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    val priceLines = buildList {
-                        add(ChartPriceLine(position.entryPrice, "Entry", AccentBlue, dashed = false))
-                        position.stopLossPrice?.let { add(ChartPriceLine(it, "SL", LossRed)) }
-                        position.takeProfitPrice?.let { add(ChartPriceLine(it, "TP", ProfitGreen)) }
-                    }
-                    CandlestickChart(state.klines, modifier = Modifier.fillMaxWidth(), priceLines = priceLines)
+                    DraggableTradeChart(
+                        klines = state.klines,
+                        entryPrice = position.entryPrice,
+                        side = position.side,
+                        quantity = position.quantity,
+                        contractSize = position.contractSize,
+                        marginUsdt = position.marginUsdt,
+                        stopLossPrice = position.stopLossPrice,
+                        takeProfitPrice = position.takeProfitPrice,
+                        onStopLossDragEnd = { price -> viewModel.setStopLossByPrice(position.id, price) },
+                        onTakeProfitDragEnd = { price -> viewModel.setTakeProfitByPrice(position.id, price) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     PositionCard(
                         position = position,
                         onClose = { viewModel.closePosition(position.id) },

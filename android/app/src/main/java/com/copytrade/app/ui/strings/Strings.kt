@@ -233,6 +233,12 @@ object Strings {
         "Isasara nito ang position sa kasalukuyang presyo ng market. Hindi na ito mababawi."
     )
     val modifyPosition = Bi("Modify", "Baguhin")
+    val viewChart = Bi("Chart", "Chart")
+    val possibleProfitLabel = Bi("Possible profit", "Posibleng kita")
+    val dragToAdjustHint = Bi(
+        "Drag the SL or TP line to adjust it, then release to apply.",
+        "I-drag ang linya ng SL o TP para baguhin ito, tapos bitawan para i-apply."
+    )
     val modifyPositionDialogTitle = Bi("Modify Position", "Baguhin ang Position")
     val modifyPositionDialogMessage = Bi(
         "Set a new stop-loss and/or take-profit for this position — leave either blank to leave it unchanged.",

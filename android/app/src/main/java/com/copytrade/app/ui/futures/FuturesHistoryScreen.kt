@@ -1,16 +1,19 @@
 package com.copytrade.app.ui.futures
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CandlestickChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -175,9 +178,8 @@ private fun TodayPnlCard(pnl: FuturesTodayPnlDto, modifier: Modifier = Modifier)
 @Composable
 internal fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit, onOpenChart: (() -> Unit)? = null) {
     val sideColor = if (order.side == "long") ProfitGreen else LossRed
-    val cardModifier = if (onOpenChart != null) Modifier.fillMaxWidth().clickable(onClick = onOpenChart) else Modifier.fillMaxWidth()
 
-    Card(modifier = cardModifier) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(order.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -212,6 +214,13 @@ internal fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Uni
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            onOpenChart?.let { openChart ->
+                OutlinedButton(onClick = openChart, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Icon(Icons.Filled.CandlestickChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(Strings.viewChart.resolve())
+                }
             }
             OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text(Strings.cancelOrder.resolve(), color = LossRed)
