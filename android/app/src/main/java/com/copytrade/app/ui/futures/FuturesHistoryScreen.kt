@@ -1,5 +1,6 @@
 package com.copytrade.app.ui.futures
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -49,7 +50,11 @@ import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FuturesHistoryScreen(onBack: () -> Unit) {
+fun FuturesHistoryScreen(
+    onBack: () -> Unit,
+    onOpenPosition: (String) -> Unit = {},
+    onOpenPendingOrder: (String) -> Unit = {}
+) {
     val viewModel = appViewModel { FuturesHistoryViewModel(it) }
     val state by viewModel.uiState.collectAsState()
     var tabIndex by remember { mutableIntStateOf(0) }
@@ -97,7 +102,8 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                                 onSetTakeProfitByPrice = { price -> viewModel.setTakeProfitByPrice(position.id, price) },
                                 onSetStopLossByRiskUsd = { risk -> viewModel.setStopLossByRiskUsd(position.id, risk) },
                                 onSetStopLossByPrice = { price -> viewModel.setStopLossByPrice(position.id, price) },
-                                phpRate = state.usdToPhpRate
+                                phpRate = state.usdToPhpRate,
+                                onOpenChart = { onOpenPosition(position.id) }
                             )
                         }
                     }
@@ -112,7 +118,11 @@ fun FuturesHistoryScreen(onBack: () -> Unit) {
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.pendingOrders, key = { it.id }) { order ->
-                            PendingOrderCard(order = order, onCancel = { viewModel.cancelOrder(order.id) })
+                            PendingOrderCard(
+                                order = order,
+                                onCancel = { viewModel.cancelOrder(order.id) },
+                                onOpenChart = { onOpenPendingOrder(order.id) }
+                            )
                         }
                     }
                 }
@@ -163,10 +173,11 @@ private fun TodayPnlCard(pnl: FuturesTodayPnlDto, modifier: Modifier = Modifier)
 }
 
 @Composable
-internal fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit) {
+internal fun PendingOrderCard(order: FuturesPendingOrderDto, onCancel: () -> Unit, onOpenChart: (() -> Unit)? = null) {
     val sideColor = if (order.side == "long") ProfitGreen else LossRed
+    val cardModifier = if (onOpenChart != null) Modifier.fillMaxWidth().clickable(onClick = onOpenChart) else Modifier.fillMaxWidth()
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = cardModifier) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(order.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

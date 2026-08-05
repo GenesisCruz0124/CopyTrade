@@ -17,6 +17,8 @@ import com.copytrade.app.ui.createbot.CreateBotScreen
 import com.copytrade.app.ui.dashboard.DashboardScreen
 import com.copytrade.app.ui.futures.FuturesHistoryScreen
 import com.copytrade.app.ui.futures.FuturesScreen
+import com.copytrade.app.ui.futures.TradeChartKind
+import com.copytrade.app.ui.futures.TradeChartScreen
 import com.copytrade.app.ui.settings.SettingsScreen
 import com.copytrade.app.ui.setup.SetupScreen
 import com.copytrade.app.ui.signals.SignalsScreen
@@ -56,7 +58,9 @@ fun CopyTradeNavGraph(
                 onOpenSignals = { navController.navigate(Screen.Signals.route) },
                 onOpenActivity = { navController.navigate(Screen.Activity.route) },
                 onOpenFutures = { navController.navigate(Screen.Futures.route) },
-                onOpenBots = { navController.navigate(Screen.Bots.route) }
+                onOpenBots = { navController.navigate(Screen.Bots.route) },
+                onOpenPosition = { id -> navController.navigate(Screen.TradeChart.route("position", id)) },
+                onOpenPendingOrder = { id -> navController.navigate(Screen.TradeChart.route("pending_order", id)) }
             )
         }
         composable(Screen.Bots.route) {
@@ -87,11 +91,32 @@ fun CopyTradeNavGraph(
         composable(Screen.Futures.route) {
             FuturesScreen(
                 onBack = { navController.popBackStack() },
-                onOpenHistory = { navController.navigate(Screen.FuturesHistory.route) }
+                onOpenHistory = { navController.navigate(Screen.FuturesHistory.route) },
+                onOpenPosition = { id -> navController.navigate(Screen.TradeChart.route("position", id)) },
+                onOpenPendingOrder = { id -> navController.navigate(Screen.TradeChart.route("pending_order", id)) }
             )
         }
         composable(Screen.FuturesHistory.route) {
-            FuturesHistoryScreen(onBack = { navController.popBackStack() })
+            FuturesHistoryScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPosition = { id -> navController.navigate(Screen.TradeChart.route("position", id)) },
+                onOpenPendingOrder = { id -> navController.navigate(Screen.TradeChart.route("pending_order", id)) }
+            )
+        }
+        composable(
+            route = Screen.TradeChart.route,
+            arguments = listOf(
+                navArgument("kind") { type = NavType.StringType },
+                navArgument("tradeId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val kindArg = backStackEntry.arguments?.getString("kind").orEmpty()
+            val tradeId = backStackEntry.arguments?.getString("tradeId").orEmpty()
+            TradeChartScreen(
+                tradeId = tradeId,
+                kind = if (kindArg == "pending_order") TradeChartKind.PENDING_ORDER else TradeChartKind.POSITION,
+                onBack = { navController.popBackStack() }
+            )
         }
         composable(
             route = Screen.BotDetail.route,
